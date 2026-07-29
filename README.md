@@ -89,6 +89,8 @@ npm run lint
 
 ## GitHub Pages deployment
 
+Live application: [Daymark](https://weeny-v.github.io/daymark/#/today)
+
 The `Deploy to GitHub Pages` workflow builds and publishes the application when
 changes are pushed to `main`. In the repository settings, select **GitHub
 Actions** as the source under **Pages → Build and deployment**.
