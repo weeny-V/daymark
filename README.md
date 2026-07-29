@@ -86,3 +86,12 @@ npm run build
 ```sh
 npm run lint
 ```
+
+## GitHub Pages deployment
+
+The `Deploy to GitHub Pages` workflow builds and publishes the application when
+changes are pushed to `main`. In the repository settings, select **GitHub
+Actions** as the source under **Pages → Build and deployment**.
+
+The production site is served from `/daymark/`. Hash-based routing keeps routed
+URLs working when they are opened or refreshed directly on GitHub Pages.
