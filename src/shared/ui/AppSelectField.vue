@@ -53,7 +53,7 @@
   padding: var(--space-3) 2.75rem var(--space-3) var(--space-4);
   color: var(--color-text);
   background: var(--color-surface);
-  border: 1px solid #cfd2dc;
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius-sm);
   outline: none;
   font: inherit;
@@ -66,7 +66,7 @@
 }
 
 .select-field__control :deep(select:hover:not(:disabled)) {
-  border-color: #aeb2bf;
+  border-color: var(--color-control-hover);
 }
 
 .select-field__control :deep(select:focus-visible) {

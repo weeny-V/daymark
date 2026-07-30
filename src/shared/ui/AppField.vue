@@ -49,7 +49,7 @@
   padding: var(--space-3) var(--space-4);
   color: var(--color-text);
   background: var(--color-surface);
-  border: 1px solid #cfd2dc;
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius-sm);
   outline: none;
   font: inherit;
@@ -72,7 +72,7 @@
 .app-field__control :deep(input:hover),
 .app-field__control :deep(textarea:hover),
 .app-field__control :deep(select:hover) {
-  border-color: #aeb2bf;
+  border-color: var(--color-control-hover);
 }
 
 .app-field__control :deep(input:focus-visible),

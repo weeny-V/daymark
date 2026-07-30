@@ -27,9 +27,12 @@ import AppNavigation from './shared/ui/AppNavigation.vue'
   --color-text: #181a20;
   --color-text-muted: #686d7a;
   --color-border: #e2e4ea;
+  --color-control-border: #cfd2dc;
+  --color-control-hover: #aeb2bf;
   --color-primary: #6558d3;
   --color-primary-soft: #eeecff;
   --color-focus: #2f6fed;
+  --color-shadow: rgb(24 26 32 / 6%);
   --shadow-header: 0 1px 0 rgb(24 26 32 / 8%);
   --radius-sm: 10px;
   --radius-md: 16px;
@@ -53,6 +56,23 @@ import AppNavigation from './shared/ui/AppNavigation.vue'
     sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #11131a;
+  --color-surface: #1a1d27;
+  --color-surface-soft: #242836;
+  --color-text: #f4f4f7;
+  --color-text-muted: #b0b5c3;
+  --color-border: #343949;
+  --color-control-border: #4a5062;
+  --color-control-hover: #687084;
+  --color-primary: #a89cff;
+  --color-primary-soft: #302b52;
+  --color-focus: #8db5ff;
+  --color-shadow: rgb(0 0 0 / 22%);
+  --shadow-header: 0 1px 0 rgb(255 255 255 / 8%);
 }
 
 * {

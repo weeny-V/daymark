@@ -10,8 +10,12 @@ managing tasks, keeping notes, and adjusting workspace settings.
 - `src/views/TodayView.vue` presents live task counts and up to five active tasks.
 - `src/views/TasksView.vue` provides task creation, filtering, completion, and
   deletion workflows.
+- `src/views/SettingsView.vue` provides browser-local appearance and planning
+  preferences.
 - `src/stores/tasks.ts` owns shared task state, actions, derived values, and
   persistence initialization.
+- `src/stores/settings.ts` owns versioned user preferences, theme resolution,
+  defaults, and persistence initialization.
 - `src/shared/hooks/useLocalStorage.ts` isolates browser-storage serialization,
   validation, and error handling.
 
@@ -19,6 +23,11 @@ managing tasks, keeping notes, and adjusting workspace settings.
 
 Daymark stores tasks in `localStorage`. Task data is local to the current browser
 and browser profile; it is not synced to other devices or backed up remotely.
+
+Workspace settings are also stored locally. Users can choose a light, dark, or
+system theme; select a date format and first day of the week; and set the
+priority applied to newly created tasks. These preferences do not require an
+account and are not synchronized between browsers or devices.
 
 ## Task state architecture
 

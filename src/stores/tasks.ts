@@ -1,9 +1,11 @@
 import {defineStore} from "pinia";
-import type {Task, TaskFilter} from "@/types/Task.ts";
+import type {Task, TaskFilter, TaskPriority} from "@/types/Task.ts";
 import {useLocalStorage} from "@/shared/hooks/useLocalStorage.ts";
 import {computed, ref, watch} from "vue";
+import { useSettingsStore } from '@/stores/settings'
 
 const TASKS_STORAGE_KEY = 'daymark.tasks'
+const taskPriorities: TaskPriority[] = ['low', 'medium', 'high']
 
 const isTask = (value: unknown): value is Task => {
   if (typeof value !== 'object' || value === null) return false
@@ -15,7 +17,8 @@ const isTask = (value: unknown): value is Task => {
     typeof task.title === 'string' &&
     typeof task.completed === 'boolean' &&
     typeof task.createdAt === 'string' &&
-    !Number.isNaN(Date.parse(task.createdAt))
+    !Number.isNaN(Date.parse(task.createdAt)) &&
+    (task.priority === undefined || taskPriorities.includes(task.priority as TaskPriority))
   )
 }
 
@@ -53,11 +56,13 @@ export const useTasksStore = defineStore('tasks', () => {
   })
 
   const addTask = ({ title }: { title: string }) => {
+    const settingsStore = useSettingsStore()
     const newTask: Task = {
       title,
       completed: false,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
+      priority: settingsStore.defaultTaskPriority,
     }
     tasks.value.push(newTask)
   }

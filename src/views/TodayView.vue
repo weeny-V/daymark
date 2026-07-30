@@ -2,10 +2,12 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTasksStore } from '@/stores/tasks'
-import dayjs from "dayjs";
+import { useSettingsStore } from '@/stores/settings'
+import { formatToday } from '@/shared/utils/date'
 
 const tasksStore = useTasksStore()
 const { count, tasks } = storeToRefs(tasksStore)
+const { dateFormat } = storeToRefs(useSettingsStore())
 
 const activeTasks = computed(() => tasks.value.filter((task) => !task.completed).slice(0, 5))
 
@@ -14,7 +16,7 @@ const activeTasks = computed(() => tasks.value.filter((task) => !task.completed)
 <template>
   <section class="today-view">
     <header>
-      <p class="eyebrow">{{ dayjs().format('dddd, MMMM D') }}</p>
+      <p class="eyebrow">{{ formatToday(dateFormat) }}</p>
       <h1>Today</h1>
       <p class="description">A calm overview of what matters and where to focus next.</p>
     </header>

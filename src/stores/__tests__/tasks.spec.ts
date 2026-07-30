@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
 import type { Task } from '@/types/Task'
+import { useSettingsStore } from '@/stores/settings'
 
 const STORAGE_KEY = 'daymark.tasks'
 
@@ -33,8 +34,21 @@ describe('task store', () => {
     expect(store.tasks[0]).toMatchObject({
       title: 'Write release notes',
       completed: false,
+      priority: 'medium',
     })
     expect(store.count).toEqual({ all: 1, active: 1, completed: 0 })
+  })
+
+  it('uses the current default priority only for newly created tasks', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([savedTask]))
+    const store = createStore()
+    store.initialize()
+    useSettingsStore().defaultTaskPriority = 'high'
+
+    store.addTask({ title: 'Plan the next release' })
+
+    expect(store.tasks[0]).toEqual(savedTask)
+    expect(store.tasks[1]?.priority).toBe('high')
   })
 
   it('toggles and deletes tasks through store actions', () => {

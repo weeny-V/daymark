@@ -47,7 +47,7 @@
   z-index: 20;
   top: 0;
   height: var(--header-height);
-  background: rgb(255 255 255 / 92%);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
   box-shadow: var(--shadow-header);
   backdrop-filter: blur(16px);
 }

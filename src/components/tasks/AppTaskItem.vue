@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Task } from '@/types/Task.js'
-import dayjs from 'dayjs';
+import { storeToRefs } from 'pinia'
+import { useSettingsStore } from '@/stores/settings'
+import { formatDate } from '@/shared/utils/date'
 
 defineProps<{
   task: Task
@@ -10,6 +12,14 @@ defineEmits<{
   delete: [id: string]
   toggle: [id: string]
 }>()
+
+const { dateFormat } = storeToRefs(useSettingsStore())
+
+const priorityLabels = {
+  low: 'Low priority',
+  medium: 'Medium priority',
+  high: 'High priority',
+} as const
 </script>
 
 <template>
@@ -30,7 +40,10 @@ defineEmits<{
         <span class="task-item__status">{{ task.completed ? 'Completed' : 'Active' }}</span>
       </p>
       <p class="task-item__meta">
-        <time :datetime="task.createdAt">{{ dayjs(task.createdAt).format('ddd, MMM D, YYYY h:mm A') }}</time>
+        <span v-if="task.priority" class="task-item__priority">
+          {{ priorityLabels[task.priority] }}
+        </span>
+        <time :datetime="task.createdAt">{{ formatDate(task.createdAt, dateFormat) }}</time>
       </p>
     </div>
 
@@ -63,7 +76,7 @@ defineEmits<{
 }
 
 .task-item:hover {
-  background: #fafaff;
+  background: var(--color-surface-soft);
 }
 
 .task-item__check-target {
@@ -110,10 +123,22 @@ defineEmits<{
 }
 
 .task-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   margin: var(--space-1) 0 0;
   color: var(--color-text-muted);
   font-size: 0.75rem;
   line-height: 1.4;
+}
+
+.task-item__priority {
+  font-weight: 700;
+}
+
+.task-item__priority::after {
+  margin-left: var(--space-2);
+  content: '·';
 }
 
 .task-item--completed .task-item__title {
