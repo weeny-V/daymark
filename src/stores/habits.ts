@@ -44,7 +44,8 @@ const isHabit = (value: unknown): value is Habit => {
   )
 }
 
-const isHabitList = (value: unknown): value is Habit[] => Array.isArray(value) && value.every(isHabit)
+export const isHabitList = (value: unknown): value is Habit[] =>
+  Array.isArray(value) && value.every(isHabit)
 
 const normalizeSchedule = (schedule: HabitSchedule): HabitSchedule =>
   schedule.type === 'daily'
@@ -97,6 +98,10 @@ export const useHabitsStore = defineStore('habits', () => {
 
   const deleteHabit = (id: string) => {
     habits.value = habits.value.filter((habit) => habit.id !== id)
+  }
+
+  const replaceAll = (value: Habit[]) => {
+    habits.value = structuredClone(value)
   }
 
   const toggleHabitForDate = (id: string, date: string) => {
@@ -163,6 +168,7 @@ export const useHabitsStore = defineStore('habits', () => {
     selectedDate,
     habitsForSelectedDate,
     initialize,
+    replaceAll,
     addHabit,
     updateHabit,
     deleteHabit,
@@ -172,4 +178,3 @@ export const useHabitsStore = defineStore('habits', () => {
     recentHistory,
   }
 })
-

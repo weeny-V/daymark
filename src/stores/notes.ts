@@ -20,13 +20,15 @@ const isNote = (value: unknown): value is Note => {
     typeof note.body === 'string' &&
     (note.pinned === undefined || typeof note.pinned === 'boolean') &&
     (note.linkedTaskIds === undefined ||
-      (Array.isArray(note.linkedTaskIds) && note.linkedTaskIds.every((id) => typeof id === 'string'))) &&
+      (Array.isArray(note.linkedTaskIds) &&
+        note.linkedTaskIds.every((id) => typeof id === 'string'))) &&
     isIsoTimestamp(note.createdAt) &&
     isIsoTimestamp(note.updatedAt)
   )
 }
 
-const isNoteList = (value: unknown): value is Note[] => Array.isArray(value) && value.every(isNote)
+export const isNoteList = (value: unknown): value is Note[] =>
+  Array.isArray(value) && value.every(isNote)
 
 export const useNotesStore = defineStore('notes', () => {
   const storage = useLocalStorage<Note[]>({
@@ -41,7 +43,8 @@ export const useNotesStore = defineStore('notes', () => {
 
   const sortedNotes = computed(() =>
     [...notes.value].sort(
-      (a, b) => Number(b.pinned) - Number(a.pinned) || Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+      (a, b) =>
+        Number(b.pinned) - Number(a.pinned) || Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
     ),
   )
   const filteredNotes = computed(() => {
@@ -54,9 +57,7 @@ export const useNotesStore = defineStore('notes', () => {
     )
   })
   const pinnedNote = computed(() => sortedNotes.value.find((note) => note.pinned))
-  const selectedNote = computed(() =>
-    notes.value.find((note) => note.id === selectedNoteId.value),
-  )
+  const selectedNote = computed(() => notes.value.find((note) => note.id === selectedNoteId.value))
 
   const persist = () => storage.set(notes.value)
 
@@ -86,6 +87,12 @@ export const useNotesStore = defineStore('notes', () => {
     selectedNoteId.value = note.id
     persist()
     return note
+  }
+
+  const replaceAll = (value: Note[]) => {
+    notes.value = structuredClone(value)
+    selectedNoteId.value = sortedNotes.value[0]?.id
+    persist()
   }
 
   const selectNote = (id: string) => {
@@ -148,6 +155,7 @@ export const useNotesStore = defineStore('notes', () => {
     pinnedNote,
     searchQuery,
     initialize,
+    replaceAll,
     createNote,
     selectNote,
     updateNote,

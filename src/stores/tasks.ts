@@ -1,10 +1,10 @@
-import {defineStore} from "pinia";
-import type {Task, TaskChanges, TaskFilter, TaskPriority} from "@/types/Task.ts";
-import {useLocalStorage} from "@/shared/hooks/useLocalStorage.ts";
-import { computed, ref, watch } from "vue";
+import { defineStore } from 'pinia'
+import type { Task, TaskChanges, TaskFilter, TaskPriority } from '@/types/Task.ts'
+import { useLocalStorage } from '@/shared/hooks/useLocalStorage.ts'
+import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import dayjs from 'dayjs'
-import { compareDateStrings } from "@/shared/utils/date.ts";
+import { compareDateStrings } from '@/shared/utils/date.ts'
 
 const TASKS_STORAGE_KEY = 'daymark.tasks'
 const taskPriorities: TaskPriority[] = ['low', 'medium', 'high']
@@ -30,7 +30,7 @@ const isTask = (value: unknown): value is Task => {
   )
 }
 
-const isTaskList = (value: unknown): value is Task[] =>
+export const isTaskList = (value: unknown): value is Task[] =>
   Array.isArray(value) && value.every(isTask)
 
 export const useTasksStore = defineStore('tasks', () => {
@@ -102,6 +102,10 @@ export const useTasksStore = defineStore('tasks', () => {
     tasks.value = tasks.value.filter((task) => task.id !== id)
   }
 
+  const replaceAll = (value: Task[]) => {
+    tasks.value = structuredClone(value)
+  }
+
   const toggleTask = (id: string) => {
     const task = tasks.value.find((task) => task.id === id)
     if (task) task.completed = !task.completed
@@ -116,13 +120,13 @@ export const useTasksStore = defineStore('tasks', () => {
   const upcoming = computed(() => {
     const sortedTasks = tasks.value
       .filter((task) => task.dueTo && !task.completed)
-      .sort((a, b) => dayjs(a.dueTo).valueOf() - dayjs(b.dueTo).valueOf());
+      .sort((a, b) => dayjs(a.dueTo).valueOf() - dayjs(b.dueTo).valueOf())
 
     return {
       overdue: sortedTasks.filter((task) => compareDateStrings(task.dueTo!) < 0),
       today: sortedTasks.filter((task) => compareDateStrings(task.dueTo!) === 0),
       later: sortedTasks.filter((task) => compareDateStrings(task.dueTo!) > 0),
-    };
+    }
   })
 
   return {
@@ -131,10 +135,11 @@ export const useTasksStore = defineStore('tasks', () => {
     deleteTask,
     filteredTasks,
     initialize,
+    replaceAll,
     tasks,
     toggleTask,
     updateTask,
     selectedFilter,
-    upcoming
+    upcoming,
   }
-});
+})

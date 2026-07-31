@@ -3,8 +3,8 @@
     <p class="not-found__eyebrow">404 · Page not found</p>
     <h1>This page is off the map</h1>
     <p class="not-found__description">
-      The page may have moved, or the address might be incorrect. Return to your
-      Today overview to keep planning.
+      The page may have moved, or the address might be incorrect. Return to your Today overview to
+      keep planning.
     </p>
     <RouterLink class="not-found__link" to="/today">Back to Today</RouterLink>
   </section>

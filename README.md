@@ -11,10 +11,10 @@ Daymark is a responsive, browser-local productivity dashboard built with Vue 3. 
 - **Upcoming** - review incomplete tasks grouped by future due date.
 - **Habits** - create daily or weekday-based habits, record completion by date, and review streak and history information.
 - **Notes** - create and autosave notes, search their content, pin important notes, and link notes to tasks.
-- **Settings** - choose a theme, date format, first day of the week, and default task priority.
+- **Settings** - choose workspace preferences and download or restore a versioned JSON backup.
 - **Responsive navigation** - use a desktop sidebar or a mobile bottom navigation bar.
 
-All productivity data is stored locally in the current browser profile. Daymark does not require an account and does not currently sync or back up data across devices.
+All productivity data is stored locally in the current browser profile. Daymark does not require an account or sync data across devices. Use **Settings > Data backup** to download a JSON copy of tasks, settings, notes, and habits. Restoring a backup validates the whole file and asks for confirmation before replacing local data.
 
 ## Technology
 

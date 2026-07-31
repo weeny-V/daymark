@@ -1,15 +1,29 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { storeToRefs } from 'pinia'
+import { ref, useTemplateRef } from 'vue'
+import { getActivePinia, storeToRefs } from 'pinia'
 import AppSelectField from '@/shared/ui/AppSelectField.vue'
+import AppDialog from '@/shared/ui/AppDialog.vue'
 import { useSettingsStore } from '@/stores/settings'
 import type { DateFormat, ThemePreference, WeekStartsOn } from '@/types/Settings'
 import type { TaskPriority } from '@/types/Task'
+import {
+  createBackup,
+  parseBackup,
+  restoreBackup,
+  summarizeBackup,
+  type BackupSummary,
+  type DaymarkBackup,
+} from '@/shared/utils/backup'
 
 const settingsStore = useSettingsStore()
-const { dateFormat, defaultTaskPriority, theme, weekStartsOn } =
-  storeToRefs(settingsStore)
+const { dateFormat, defaultTaskPriority, theme, weekStartsOn } = storeToRefs(settingsStore)
 const resetMessage = ref('')
+const backupMessage = ref('')
+const pendingBackup = ref<DaymarkBackup>()
+const pendingSummary = ref<BackupSummary>()
+const restoreDialogOpen = ref(false)
+const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
+const pinia = getActivePinia()!
 
 const themeOptions: { value: ThemePreference; label: string; description: string }[] = [
   { value: 'light', label: 'Light', description: 'Use the bright Daymark palette.' },
@@ -24,6 +38,48 @@ const themeOptions: { value: ThemePreference; label: string; description: string
 const resetSettings = () => {
   settingsStore.reset()
   resetMessage.value = 'Settings were reset to their defaults.'
+}
+
+const exportBackup = () => {
+  const backup = createBackup(pinia)
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `daymark-backup-${backup.exportedAt.slice(0, 10)}.json`
+  link.click()
+  URL.revokeObjectURL(url)
+  backupMessage.value = 'Backup downloaded.'
+}
+
+const chooseBackup = () => fileInput.value?.click()
+
+const readBackup = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  backupMessage.value = ''
+  try {
+    const backup = parseBackup(await file.text())
+    pendingBackup.value = backup
+    pendingSummary.value = summarizeBackup(backup)
+    restoreDialogOpen.value = true
+  } catch (error) {
+    pendingBackup.value = undefined
+    pendingSummary.value = undefined
+    backupMessage.value = error instanceof Error ? error.message : 'This backup could not be read.'
+  }
+}
+
+const confirmRestore = () => {
+  if (!pendingBackup.value) return
+  restoreBackup(pinia, pendingBackup.value)
+  pendingBackup.value = undefined
+  pendingSummary.value = undefined
+  restoreDialogOpen.value = false
+  backupMessage.value = 'Backup restored. Your previous local data was replaced.'
 }
 </script>
 
@@ -110,15 +166,66 @@ const resetSettings = () => {
           <h2 id="reset-title">Reset preferences</h2>
           <p>Restore the system theme, US date format, Monday week start, and medium priority.</p>
         </div>
-        <button class="reset-button" type="button" @click="resetSettings">
-          Reset to defaults
-        </button>
+        <button class="reset-button" type="button" @click="resetSettings">Reset to defaults</button>
+      </section>
+
+      <section class="settings-card settings-card--data" aria-labelledby="data-title">
+        <div>
+          <h2 id="data-title">Data backup</h2>
+          <p>
+            Download tasks, settings, notes, and habits as JSON, or restore a Daymark backup.
+            Restoring replaces all current data after you review a summary.
+          </p>
+        </div>
+        <div class="data-actions">
+          <button class="data-button" type="button" @click="exportBackup">Download backup</button>
+          <button class="data-button" type="button" @click="chooseBackup">Restore backup</button>
+          <input
+            ref="fileInput"
+            class="file-input"
+            type="file"
+            accept="application/json,.json"
+            aria-label="Choose a Daymark JSON backup"
+            @change="readBackup"
+          />
+        </div>
       </section>
     </form>
 
     <p class="settings-status" role="status" aria-live="polite">
-      {{ resetMessage }}
+      {{ backupMessage || resetMessage }}
     </p>
+
+    <AppDialog
+      v-model:open="restoreDialogOpen"
+      title="Replace your Daymark data?"
+      description="Review this backup before restoring it. This action cannot be undone."
+    >
+      <dl v-if="pendingSummary" class="backup-summary">
+        <div>
+          <dt>Tasks</dt>
+          <dd>{{ pendingSummary.tasks }}</dd>
+        </div>
+        <div>
+          <dt>Notes</dt>
+          <dd>{{ pendingSummary.notes }}</dd>
+        </div>
+        <div>
+          <dt>Habits</dt>
+          <dd>{{ pendingSummary.habits }}</dd>
+        </div>
+        <div>
+          <dt>Settings</dt>
+          <dd>Included</dd>
+        </div>
+      </dl>
+      <template #footer>
+        <button class="data-button" type="button" @click="restoreDialogOpen = false">Cancel</button>
+        <button class="restore-button" type="button" @click="confirmRestore">
+          Replace all data
+        </button>
+      </template>
+    </AppDialog>
   </section>
 </template>
 
@@ -270,7 +377,9 @@ h2 {
   justify-content: space-between;
 }
 
-.reset-button {
+.reset-button,
+.data-button,
+.restore-button {
   flex: 0 0 auto;
   min-height: 2.75rem;
   padding: var(--space-3) var(--space-4);
@@ -283,8 +392,53 @@ h2 {
   cursor: pointer;
 }
 
-.reset-button:hover {
+.reset-button:hover,
+.data-button:hover {
   background: var(--color-surface-soft);
+}
+
+.settings-card--data {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.restore-button {
+  color: white;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.backup-summary {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.backup-summary div {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.backup-summary dd {
+  margin: 0;
+  font-weight: 750;
 }
 
 .settings-status {
@@ -306,6 +460,11 @@ h2 {
   }
 
   .reset-button {
+    width: 100%;
+  }
+
+  .data-actions,
+  .data-button {
     width: 100%;
   }
 }

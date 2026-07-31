@@ -1,12 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { useLocalStorage } from '@/shared/hooks/useLocalStorage'
-import type {
-  DateFormat,
-  Settings,
-  ThemePreference,
-  WeekStartsOn,
-} from '@/types/Settings'
+import type { DateFormat, Settings, ThemePreference, WeekStartsOn } from '@/types/Settings'
 import type { TaskPriority } from '@/types/Task'
 
 export const SETTINGS_STORAGE_KEY = 'daymark.settings'
@@ -24,7 +19,7 @@ const dateFormats: DateFormat[] = ['MMMM D, YYYY', 'D MMMM YYYY', 'YYYY-MM-DD']
 const weekStarts: WeekStartsOn[] = [0, 1]
 const priorities: TaskPriority[] = ['low', 'medium', 'high']
 
-const isSettings = (value: unknown): value is Settings => {
+export const isSettings = (value: unknown): value is Settings => {
   if (typeof value !== 'object' || value === null) return false
 
   const settings = value as Record<string, unknown>
@@ -81,9 +76,7 @@ export const useSettingsStore = defineStore('settings', () => {
       settings.value.defaultTaskPriority = value
     },
   })
-  const resolvedTheme = computed(() =>
-    theme.value === 'system' ? systemTheme.value : theme.value,
-  )
+  const resolvedTheme = computed(() => (theme.value === 'system' ? systemTheme.value : theme.value))
 
   const applyTheme = () => {
     if (typeof document === 'undefined') return
@@ -94,6 +87,10 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const reset = () => {
     settings.value = createDefaults()
+  }
+
+  const replaceAll = (value: Settings) => {
+    settings.value = structuredClone(value)
   }
 
   const initialize = () => {
@@ -120,6 +117,7 @@ export const useSettingsStore = defineStore('settings', () => {
     defaultTaskPriority,
     initialize,
     reset,
+    replaceAll,
     resolvedTheme,
     settings,
     theme,
