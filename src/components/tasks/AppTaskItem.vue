@@ -10,6 +10,7 @@ defineProps<{
 
 defineEmits<{
   delete: [id: string]
+  edit: [id: string]
   toggle: [id: string]
 }>()
 
@@ -43,20 +44,40 @@ const priorityLabels = {
         <span v-if="task.priority" class="task-item__priority">
           {{ priorityLabels[task.priority] }}
         </span>
-        <time :datetime="task.createdAt">{{ formatDate(task.createdAt, dateFormat) }}</time>
+        <span v-if="task.dueTo" class="task-item__due-date">
+          Due
+          <time :datetime="task.dueTo">{{ formatDate(task.dueTo, dateFormat) }}</time>
+        </span>
+        <span class="task-item__created">
+          Created
+          <time :datetime="task.createdAt">{{ formatDate(task.createdAt, dateFormat) }}</time>
+        </span>
       </p>
     </div>
 
-    <button
-      class="task-item__delete"
-      type="button"
-      :aria-label="`Delete ${task.title}`"
-      @click="$emit('delete', task.id)"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
-      </svg>
-    </button>
+    <div class="task-item__actions">
+      <button
+        class="task-item__action task-item__edit"
+        type="button"
+        :aria-label="`Edit ${task.title}`"
+        @click="$emit('edit', task.id)"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20ZM14.5 6.7l2.8 2.8" />
+        </svg>
+      </button>
+
+      <button
+        class="task-item__action task-item__delete"
+        type="button"
+        :aria-label="`Delete ${task.title}`"
+        @click="$emit('delete', task.id)"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+        </svg>
+      </button>
+    </div>
   </li>
 </template>
 
@@ -136,9 +157,20 @@ const priorityLabels = {
   font-weight: 700;
 }
 
-.task-item__priority::after {
-  margin-left: var(--space-2);
+.task-item__meta > * {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: baseline;
+}
+
+.task-item__meta > * + *::before {
+  margin-right: var(--space-1);
   content: '·';
+}
+
+.task-item__due-date {
+  color: var(--color-primary);
+  font-weight: 700;
 }
 
 .task-item--completed .task-item__title {
@@ -146,7 +178,12 @@ const priorityLabels = {
   text-decoration: line-through;
 }
 
-.task-item__delete {
+.task-item__actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.task-item__action {
   display: grid;
   width: 2.75rem;
   height: 2.75rem;
@@ -159,12 +196,17 @@ const priorityLabels = {
   place-items: center;
 }
 
+.task-item__edit:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
 .task-item__delete:hover {
   color: #b42318;
   background: #fff0ef;
 }
 
-.task-item__delete svg {
+.task-item__action svg {
   width: 1.2rem;
   fill: none;
   stroke: currentColor;
@@ -177,6 +219,10 @@ const priorityLabels = {
   .task-item {
     gap: var(--space-2);
     padding-inline: var(--space-4);
+  }
+
+  .task-item__actions {
+    gap: 0;
   }
 }
 

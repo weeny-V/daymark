@@ -24,6 +24,15 @@ const router = createRouter({
       },
     },
     {
+      path: '/upcoming',
+      name: 'upcoming',
+      component: () => import('../views/UpcomingView.vue'),
+      meta: {
+        title: 'Upcoming',
+        navigationLabel: 'Upcoming',
+      },
+    },
+    {
       path: '/notes',
       name: 'notes',
       component: () => import('../views/NotesView.vue'),

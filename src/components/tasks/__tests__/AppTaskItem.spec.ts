@@ -36,4 +36,31 @@ describe('AppTaskItem', () => {
 
     expect(wrapper.emitted('delete')).toEqual([[task.id]])
   })
+
+  it('requests editing for the selected task', async () => {
+    const wrapper = mountTaskItem()
+
+    await wrapper.get(`button[aria-label="Edit ${task.title}"]`).trigger('click')
+
+    expect(wrapper.emitted('edit')).toEqual([[task.id]])
+  })
+
+  it('shows a formatted due date when the task has one', () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const wrapper = mount(AppTaskItem, {
+      props: { task: { ...task, dueTo: '2026-08-10' } },
+      global: { plugins: [pinia] },
+    })
+    const dueDate = wrapper.get('.task-item__due-date time')
+
+    expect(dueDate.attributes('datetime')).toBe('2026-08-10')
+    expect(dueDate.text()).toBe('August 10, 2026')
+  })
+
+  it('does not show a due date for unscheduled tasks', () => {
+    const wrapper = mountTaskItem()
+
+    expect(wrapper.find('.task-item__due-date').exists()).toBe(false)
+  })
 })

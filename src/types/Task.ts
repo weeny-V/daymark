@@ -6,6 +6,12 @@ export type Task = {
   id: string
   createdAt: string
   priority?: TaskPriority
+  dueTo?: string
+}
+
+export type TaskChanges = {
+  title?: string
+  dueTo?: string
 }
 
 export type TaskFilter = 'all' | 'active' | 'completed'

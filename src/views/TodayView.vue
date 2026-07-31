@@ -149,9 +149,14 @@ h2 {
 }
 
 .focus__list li {
-  padding: var(--space-4);
-  background: var(--color-surface-soft);
+  padding: var(--space-4) var(--space-5);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-control-border);
+  border-left: 4px solid var(--color-primary);
   border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px var(--color-shadow);
+  font-weight: 600;
   line-height: 1.5;
 }
 

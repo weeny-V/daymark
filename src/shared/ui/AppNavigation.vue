@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const destinations = [
   { label: 'Today', to: '/today', icon: 'today' },
+  { label: 'Upcoming', to: '/upcoming', icon: 'upcoming' },
   { label: 'Tasks', to: '/tasks', icon: 'tasks' },
   { label: 'Notes', to: '/notes', icon: 'notes' },
   { label: 'Settings', to: '/settings', icon: 'settings' },
@@ -17,6 +18,13 @@ const destinations = [
           </svg>
           <svg v-else-if="destination.icon === 'tasks'" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" />
+          </svg>
+          <svg
+            v-else-if="destination.icon === 'upcoming'"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M5 5h14v15H5zM8 3v4M16 3v4M5 9h14M9 13h6M9 17h4" />
           </svg>
           <svg v-else-if="destination.icon === 'notes'" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7" />
@@ -102,7 +110,7 @@ const destinations = [
   }
 
   .app-navigation__list {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: var(--space-1);
   }
 

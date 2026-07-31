@@ -1,11 +1,18 @@
 import {defineStore} from "pinia";
-import type {Task, TaskFilter, TaskPriority} from "@/types/Task.ts";
+import type {Task, TaskChanges, TaskFilter, TaskPriority} from "@/types/Task.ts";
 import {useLocalStorage} from "@/shared/hooks/useLocalStorage.ts";
-import {computed, ref, watch} from "vue";
+import { computed, ref, watch } from "vue";
 import { useSettingsStore } from '@/stores/settings'
+import dayjs from 'dayjs'
+import { compareDateStrings } from "@/shared/utils/date.ts";
 
 const TASKS_STORAGE_KEY = 'daymark.tasks'
 const taskPriorities: TaskPriority[] = ['low', 'medium', 'high']
+const isDateOnly = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  dayjs(value).isValid() &&
+  dayjs(value).format('YYYY-MM-DD') === value
 
 const isTask = (value: unknown): value is Task => {
   if (typeof value !== 'object' || value === null) return false
@@ -18,7 +25,8 @@ const isTask = (value: unknown): value is Task => {
     typeof task.completed === 'boolean' &&
     typeof task.createdAt === 'string' &&
     !Number.isNaN(Date.parse(task.createdAt)) &&
-    (task.priority === undefined || taskPriorities.includes(task.priority as TaskPriority))
+    (task.priority === undefined || taskPriorities.includes(task.priority as TaskPriority)) &&
+    (task.dueTo === undefined || isDateOnly(task.dueTo))
   )
 }
 
@@ -55,16 +63,39 @@ export const useTasksStore = defineStore('tasks', () => {
     return tasks.value
   })
 
-  const addTask = ({ title }: { title: string }) => {
+  const addTask = ({ title, dueTo }: { title: string; dueTo?: string }) => {
+    const normalizedTitle = title.trim()
+    if (!normalizedTitle || (dueTo && !isDateOnly(dueTo))) return false
+
     const settingsStore = useSettingsStore()
     const newTask: Task = {
-      title,
+      title: normalizedTitle,
       completed: false,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       priority: settingsStore.defaultTaskPriority,
+      ...(dueTo ? { dueTo } : {}),
     }
     tasks.value.push(newTask)
+    return true
+  }
+
+  const updateTask = (id: string, changes: TaskChanges) => {
+    const task = tasks.value.find((item) => item.id === id)
+    if (!task) return false
+
+    const normalizedTitle = changes.title?.trim()
+    if (changes.title !== undefined && !normalizedTitle) return false
+    if (changes.dueTo && !isDateOnly(changes.dueTo)) return false
+
+    if (normalizedTitle !== undefined) task.title = normalizedTitle
+
+    if (Object.hasOwn(changes, 'dueTo')) {
+      if (changes.dueTo) task.dueTo = changes.dueTo
+      else delete task.dueTo
+    }
+
+    return true
   }
 
   const deleteTask = (id: string) => {
@@ -82,6 +113,18 @@ export const useTasksStore = defineStore('tasks', () => {
     completed: tasks.value.filter((task) => task.completed).length,
   }))
 
+  const upcoming = computed(() => {
+    const sortedTasks = tasks.value
+      .filter((task) => task.dueTo && !task.completed)
+      .sort((a, b) => dayjs(a.dueTo).valueOf() - dayjs(b.dueTo).valueOf());
+
+    return {
+      overdue: sortedTasks.filter((task) => compareDateStrings(task.dueTo!) < 0),
+      today: sortedTasks.filter((task) => compareDateStrings(task.dueTo!) === 0),
+      later: sortedTasks.filter((task) => compareDateStrings(task.dueTo!) > 0),
+    };
+  })
+
   return {
     addTask,
     count,
@@ -90,6 +133,8 @@ export const useTasksStore = defineStore('tasks', () => {
     initialize,
     tasks,
     toggleTask,
+    updateTask,
     selectedFilter,
+    upcoming
   }
 });

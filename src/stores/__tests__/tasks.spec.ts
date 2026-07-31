@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
@@ -24,6 +24,10 @@ describe('task store', () => {
     localStorage.clear()
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('adds a task and updates progress counts', () => {
     const store = createStore()
     store.initialize()
@@ -37,6 +41,66 @@ describe('task store', () => {
       priority: 'medium',
     })
     expect(store.count).toEqual({ all: 1, active: 1, completed: 0 })
+  })
+
+  it('stores an optional due date on a new task', () => {
+    const store = createStore()
+    store.initialize()
+
+    store.addTask({ title: 'Prepare the demo', dueTo: '2026-08-10' })
+
+    expect(store.tasks[0]?.dueTo).toBe('2026-08-10')
+  })
+
+  it('updates a task title and due date and can remove the due date', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...savedTask, dueTo: '2026-08-10' }]))
+    const store = createStore()
+    store.initialize()
+
+    expect(
+      store.updateTask(savedTask.id, { title: 'Plan the daily review', dueTo: '2026-08-12' }),
+    ).toBe(true)
+    expect(store.tasks[0]).toMatchObject({
+      title: 'Plan the daily review',
+      dueTo: '2026-08-12',
+    })
+
+    expect(store.updateTask(savedTask.id, { dueTo: undefined })).toBe(true)
+    expect(store.tasks[0]).not.toHaveProperty('dueTo')
+  })
+
+  it('rejects invalid task updates without changing the task', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([savedTask]))
+    const store = createStore()
+    store.initialize()
+
+    expect(store.updateTask(savedTask.id, { title: '   ' })).toBe(false)
+    expect(
+      store.updateTask(savedTask.id, { title: 'Should not be saved', dueTo: '2026-02-31' }),
+    ).toBe(false)
+    expect(store.tasks[0]).toEqual(savedTask)
+  })
+
+  it('groups active scheduled tasks around the current local day in due-date order', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 31, 23, 59, 59))
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        { ...savedTask, id: 'later-2', dueTo: '2026-08-02' },
+        { ...savedTask, id: 'overdue', dueTo: '2026-07-30' },
+        { ...savedTask, id: 'today', dueTo: '2026-07-31' },
+        { ...savedTask, id: 'later-1', dueTo: '2026-08-01' },
+        { ...savedTask, id: 'completed', dueTo: '2026-07-30', completed: true },
+        { ...savedTask, id: 'unscheduled' },
+      ]),
+    )
+    const store = createStore()
+    store.initialize()
+
+    expect(store.upcoming.overdue.map((task) => task.id)).toEqual(['overdue'])
+    expect(store.upcoming.today.map((task) => task.id)).toEqual(['today'])
+    expect(store.upcoming.later.map((task) => task.id)).toEqual(['later-1', 'later-2'])
   })
 
   it('uses the current default priority only for newly created tasks', () => {

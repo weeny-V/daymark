@@ -8,10 +8,24 @@ import { useForm } from '@/shared/hooks/useForm.js'
 import AppTasksEmptyState from "@/components/tasks/AppTasksEmptyState.vue";
 import {useTasksStore} from "@/stores/tasks.ts";
 import {storeToRefs} from "pinia";
+import AppDatePicker from "@/shared/ui/AppDatePicker.vue";
+import { compareDateStrings } from "@/shared/utils/date.ts";
+import AppTaskEditDialog from '@/components/tasks/AppTaskEditDialog.vue'
+import { computed, ref } from 'vue'
 
 const tasksStore = useTasksStore()
 const { count, filteredTasks, selectedFilter } = storeToRefs(tasksStore)
 const { addTask, deleteTask, toggleTask } = tasksStore
+const editingTaskId = ref<string | null>(null)
+const editingTask = computed(
+  () => tasksStore.tasks.find((task) => task.id === editingTaskId.value) ?? null,
+)
+const editDialogOpen = computed({
+  get: () => editingTask.value !== null,
+  set: (open) => {
+    if (!open) editingTaskId.value = null
+  },
+})
 
 const {
   state: form,
@@ -21,11 +35,17 @@ const {
 } = useForm({
   initialState: {
     title: '',
+    dueTo: ''
   },
   validators: {
     title: (value) => {
       if (!value.trim()) return 'Task title cannot be empty'
     },
+    dueTo: (value) => {
+      if (value && compareDateStrings(value) < 0) {
+        return 'Due date must be today or later'
+      }
+    }
   },
 })
 
@@ -33,6 +53,9 @@ const submitTask = handleSubmit((values) => {
   addTask(values)
   reset()
 })
+const openEditor = (taskId: string) => {
+  editingTaskId.value = taskId
+}
 </script>
 
 <template>
@@ -64,6 +87,14 @@ const submitTask = handleSubmit((values) => {
         </template>
       </AppField>
 
+      <AppDatePicker
+        v-model="form.dueTo"
+        label="Due date"
+        name="dueTo"
+        :error="errors.dueTo"
+        hint="When should this task be completed?"
+      />
+
       <AppButton type="submit">Add task</AppButton>
     </form>
 
@@ -92,9 +123,12 @@ const submitTask = handleSubmit((values) => {
         :key="task.id"
         :task="task"
         @delete="deleteTask"
+        @edit="openEditor"
         @toggle="toggleTask"
       />
     </AppTasksList>
+
+    <AppTaskEditDialog v-model:open="editDialogOpen" :task="editingTask" />
   </section>
 </template>
 
@@ -123,14 +157,13 @@ h1 {
 
 .task-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: start;
   margin-top: var(--space-8);
 }
 
 .task-form > :last-child {
-  margin-top: 1.725rem;
+  width: 100%;
 }
 
 .task-filter {
@@ -138,16 +171,18 @@ h1 {
   margin: var(--space-6) 0 0 auto;
 }
 
-@media (max-width: 600px) {
+@media (min-width: 700px) {
   .task-form {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.65fr) auto;
   }
 
   .task-form > :last-child {
-    width: 100%;
-    margin-top: 0;
+    width: auto;
+    margin-top: 1.725rem;
   }
+}
 
+@media (max-width: 600px) {
   .task-filter {
     width: 100%;
   }

@@ -47,6 +47,21 @@ describe('TasksView', () => {
     expect((input.element as HTMLInputElement).value).toBe('')
   })
 
+  it('updates a task title and due date from the edit dialog', async () => {
+    const wrapper = mountTasksView()
+    const store = useTasksStore()
+    store.addTask({ title: 'Original task', dueTo: '2026-08-10' })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('button[aria-label="Edit Original task"]').trigger('click')
+    await wrapper.get('input[name="editTitle"]').setValue('Updated task')
+    await wrapper.get('input[name="editDueTo"]').setValue('2026-08-12')
+    await wrapper.get('form[aria-label="Edit task"]').trigger('submit')
+
+    expect(store.tasks[0]).toMatchObject({ title: 'Updated task', dueTo: '2026-08-12' })
+    expect(wrapper.find('dialog').exists()).toBe(false)
+  })
+
   it('has no critical automated accessibility violations', async () => {
     const wrapper = mountTasksView()
     document.body.append(wrapper.element)
