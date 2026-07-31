@@ -1,108 +1,81 @@
 # Daymark
 
-Daymark is a responsive Vue 3 productivity dashboard for planning the day,
-managing tasks, keeping notes, and adjusting workspace settings.
+Daymark is a responsive, browser-local productivity dashboard built with Vue 3. It brings daily planning, task management, habit tracking, notes, and workspace preferences into one calm interface.
 
-## Application structure
+[Open the live application](https://weeny-v.github.io/daymark/#/today)
 
-- `src/router/index.ts` defines lazy-loaded routes for Today, Tasks, Notes,
-  Settings, and the not-found page.
-- `src/views/TodayView.vue` presents live task counts and up to five active tasks.
-- `src/views/TasksView.vue` provides task creation, filtering, completion, and
-  deletion workflows.
-- `src/views/SettingsView.vue` provides browser-local appearance and planning
-  preferences.
-- `src/stores/tasks.ts` owns shared task state, actions, derived values, and
-  persistence initialization.
-- `src/stores/settings.ts` owns versioned user preferences, theme resolution,
-  defaults, and persistence initialization.
-- `src/shared/hooks/useLocalStorage.ts` isolates browser-storage serialization,
-  validation, and error handling.
+## Features
 
-## Local data
+- **Today dashboard** - review overdue and due-today tasks, capture a task quickly, complete scheduled habits, open a pinned note, and see combined daily progress.
+- **Tasks** - create, complete, filter, and delete tasks with priorities and due dates.
+- **Upcoming** - review incomplete tasks grouped by future due date.
+- **Habits** - create daily or weekday-based habits, record completion by date, and review streak and history information.
+- **Notes** - create and autosave notes, search their content, pin important notes, and link notes to tasks.
+- **Settings** - choose a theme, date format, first day of the week, and default task priority.
+- **Responsive navigation** - use a desktop sidebar or a mobile bottom navigation bar.
 
-Daymark stores tasks in `localStorage`. Task data is local to the current browser
-and browser profile; it is not synced to other devices or backed up remotely.
+All productivity data is stored locally in the current browser profile. Daymark does not require an account and does not currently sync or back up data across devices.
 
-Workspace settings are also stored locally. Users can choose a light, dark, or
-system theme; select a date format and first day of the week; and set the
-priority applied to newly created tasks. These preferences do not require an
-account and are not synchronized between browsers or devices.
+## Technology
 
-## Task state architecture
+- Vue 3 and TypeScript
+- Vue Router and Pinia
+- Day.js for date handling
+- Motion for Vue (`motion-v`) for purposeful, reduced-motion-aware animation
+- Vite
+- Vitest, Vue Test Utils, and axe-core
+- ESLint, Oxlint, Oxfmt, and `vue-tsc`
 
-The setup-style Pinia store in `src/stores/tasks.ts` is the single owner of the
-task collection and active filter. It exposes task actions (`addTask`,
-`toggleTask`, `deleteTask`, and `initialize`) along with derived filtered tasks
-and progress counts. Routed views read reactive store values with `storeToRefs`
-and request changes through store actions instead of mutating the task array.
+## Project structure
 
-Persistence remains behind `src/shared/hooks/useLocalStorage.ts`. The task store
-provides the storage key and task validator, hydrates state through its guarded
-`initialize` action during application bootstrap, and installs one watcher to
-save later task changes. This makes hydrated task state available before any
-route renders while keeping browser-storage parsing and error handling separate
-from task-domain logic and presentation components.
+```text
+src/
+  components/       Feature components
+  router/           Lazy-loaded routes and page metadata
+  shared/           Reusable hooks and UI
+  stores/           Pinia stores and persistence lifecycles
+  types/            Domain types
+  views/            Routed Today, Tasks, Upcoming, Habits, Notes, and Settings pages
+```
 
-## Date and time handling
+The stores in `src/stores` are the source of truth for tasks, habits, notes, and settings. Each store owns its domain actions and derived state. Browser persistence is initialized during application startup and kept behind store actions and `src/shared/hooks/useLocalStorage.ts` rather than being scattered through components.
 
-Use [Day.js](https://day.js.org/) for application date parsing, formatting,
-comparison, and date arithmetic. Keep persisted timestamps in ISO 8601 format
-and convert them to user-facing values at the display boundary. Use the native
-`Date` API only where a browser or platform API specifically requires it.
+Persisted dates and timestamps use ISO 8601 strings. Day.js handles application date parsing, comparison, arithmetic, and display formatting.
 
-## Recommended IDE Setup
+## Getting started
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+Requirements: Node.js `^22.18.0` or `>=24.12.0` and npm.
 
 ```sh
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+The development server prints the local URL after startup.
+
+## Quality checks
 
 ```sh
+npm run test
+npm run type-check
+npm run lint
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+To format source files, run:
 
 ```sh
-npm run lint
+npm run format
 ```
 
-## GitHub Pages deployment
+The interface is designed and tested around representative widths of 375 px, 768 px, and 1440 px. Interactive behavior should remain keyboard accessible, expose visible focus states, and respect `prefers-reduced-motion`.
 
-Live application: [Daymark](https://weeny-v.github.io/daymark/#/today)
+## Backlog and requirements
 
-The `Deploy to GitHub Pages` workflow builds and publishes the application when
-changes are pushed to `main`. In the repository settings, select **GitHub
-Actions** as the source under **Pages → Build and deployment**.
+The canonical backlog, priorities, acceptance criteria, and task status live in [Vue Productivity Dashboard - Project Tasks](https://app.notion.com/p/9fe5b777b9dc449fbef4056341e52a38?v=16ae284ee1624f30a30badc6984cadab&source=copy_link).
 
-The production site is served from `/daymark/`. Hash-based routing keeps routed
-URLs working when they are opened or refreshed directly on GitHub Pages.
+## Deployment
+
+The `Deploy to GitHub Pages` workflow builds and publishes the application when changes are pushed to `main`. GitHub Pages must use **GitHub Actions** as its build source.
+
+The production site is served from `/daymark/`. Hash-based routing allows routed URLs to open and refresh correctly on GitHub Pages.
