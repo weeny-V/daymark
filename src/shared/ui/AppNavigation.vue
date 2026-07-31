@@ -3,6 +3,7 @@ const destinations = [
   { label: 'Today', to: '/today', icon: 'today' },
   { label: 'Upcoming', to: '/upcoming', icon: 'upcoming' },
   { label: 'Tasks', to: '/tasks', icon: 'tasks' },
+  { label: 'Habits', to: '/habits', icon: 'habits' },
   { label: 'Notes', to: '/notes', icon: 'notes' },
   { label: 'Settings', to: '/settings', icon: 'settings' },
 ] as const
@@ -28,6 +29,9 @@ const destinations = [
           </svg>
           <svg v-else-if="destination.icon === 'notes'" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7" />
+          </svg>
+          <svg v-else-if="destination.icon === 'habits'" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 13l4 4 8-10M12 3a9 9 0 1 0 9 9" />
           </svg>
           <svg v-else viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="3" />
@@ -110,7 +114,7 @@ const destinations = [
   }
 
   .app-navigation__list {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--space-1);
   }
 
