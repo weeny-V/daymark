@@ -215,6 +215,14 @@ const confirmRestore = () => {
           <dd>{{ pendingSummary.habits }}</dd>
         </div>
         <div>
+          <dt>Projects</dt>
+          <dd>{{ pendingSummary.projects }}</dd>
+        </div>
+        <div>
+          <dt>Tags</dt>
+          <dd>{{ pendingSummary.tags }}</dd>
+        </div>
+        <div>
           <dt>Settings</dt>
           <dd>Included</dd>
         </div>

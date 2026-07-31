@@ -3,6 +3,7 @@ import type { Task, TaskChanges, TaskFilter, TaskPriority } from '@/types/Task.t
 import { useLocalStorage } from '@/shared/hooks/useLocalStorage.ts'
 import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useOrganizationStore } from '@/stores/organization'
 import dayjs from 'dayjs'
 import { compareDateStrings } from '@/shared/utils/date.ts'
 
@@ -26,7 +27,12 @@ const isTask = (value: unknown): value is Task => {
     typeof task.createdAt === 'string' &&
     !Number.isNaN(Date.parse(task.createdAt)) &&
     (task.priority === undefined || taskPriorities.includes(task.priority as TaskPriority)) &&
-    (task.dueTo === undefined || isDateOnly(task.dueTo))
+    (task.dueTo === undefined || isDateOnly(task.dueTo)) &&
+    (task.projectId === undefined || typeof task.projectId === 'string') &&
+    (task.tagIds === undefined ||
+      (Array.isArray(task.tagIds) &&
+        task.tagIds.every((id) => typeof id === 'string') &&
+        new Set(task.tagIds).size === task.tagIds.length))
   )
 }
 
@@ -51,16 +57,26 @@ export const useTasksStore = defineStore('tasks', () => {
     initialized = true
   }
 
+  const organizationFilteredTasks = computed(() => {
+    const settings = useOrganizationStore()
+    let result = tasks.value
+    if (settings.selectedProjectId !== 'all') {
+      result = result.filter((task) => task.projectId === settings.selectedProjectId)
+    }
+    if (settings.selectedTagId !== 'all') {
+      result = result.filter((task) => task.tagIds?.includes(settings.selectedTagId))
+    }
+    return result
+  })
+
   const filteredTasks = computed(() => {
     if (selectedFilter.value === 'active') {
-      return tasks.value.filter((task) => !task.completed)
+      return organizationFilteredTasks.value.filter((task) => !task.completed)
     }
-
     if (selectedFilter.value === 'completed') {
-      return tasks.value.filter((task) => task.completed)
+      return organizationFilteredTasks.value.filter((task) => task.completed)
     }
-
-    return tasks.value
+    return organizationFilteredTasks.value
   })
 
   const addTask = ({ title, dueTo }: { title: string; dueTo?: string }) => {
@@ -94,6 +110,11 @@ export const useTasksStore = defineStore('tasks', () => {
       if (changes.dueTo) task.dueTo = changes.dueTo
       else delete task.dueTo
     }
+    if (Object.hasOwn(changes, 'projectId')) {
+      if (changes.projectId) task.projectId = changes.projectId
+      else delete task.projectId
+    }
+    if (changes.tagIds !== undefined) task.tagIds = [...new Set(changes.tagIds)]
 
     return true
   }
@@ -106,15 +127,27 @@ export const useTasksStore = defineStore('tasks', () => {
     tasks.value = structuredClone(value)
   }
 
+  const clearProject = (id: string) => {
+    tasks.value.forEach((task) => {
+      if (task.projectId === id) delete task.projectId
+    })
+  }
+
+  const clearTag = (id: string) => {
+    tasks.value.forEach((task) => {
+      if (task.tagIds?.includes(id)) task.tagIds = task.tagIds.filter((tagId) => tagId !== id)
+    })
+  }
+
   const toggleTask = (id: string) => {
     const task = tasks.value.find((task) => task.id === id)
     if (task) task.completed = !task.completed
   }
 
   const count = computed(() => ({
-    all: tasks.value.length,
-    active: tasks.value.filter((task) => !task.completed).length,
-    completed: tasks.value.filter((task) => task.completed).length,
+    all: organizationFilteredTasks.value.length,
+    active: organizationFilteredTasks.value.filter((task) => !task.completed).length,
+    completed: organizationFilteredTasks.value.filter((task) => task.completed).length,
   }))
 
   const upcoming = computed(() => {
@@ -132,6 +165,8 @@ export const useTasksStore = defineStore('tasks', () => {
   return {
     addTask,
     count,
+    clearProject,
+    clearTag,
     deleteTask,
     filteredTasks,
     initialize,

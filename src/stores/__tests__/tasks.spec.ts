@@ -4,6 +4,7 @@ import { nextTick } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
 import type { Task } from '@/types/Task'
 import { useSettingsStore } from '@/stores/settings'
+import { useOrganizationStore } from '@/stores/organization'
 
 const STORAGE_KEY = 'daymark.tasks'
 
@@ -145,6 +146,27 @@ describe('task store', () => {
 
     store.selectedFilter = 'all'
     expect(store.filteredTasks).toHaveLength(2)
+  })
+
+  it('scopes status counters to the selected project and tag', () => {
+    const store = createStore()
+    const organization = useOrganizationStore()
+    store.replaceAll([
+      { ...savedTask, id: 'matching', projectId: 'project-1', tagIds: ['tag-1'] },
+      { ...savedTask, id: 'other-project', projectId: 'project-2', tagIds: ['tag-1'] },
+      {
+        ...savedTask,
+        id: 'completed-match',
+        completed: true,
+        projectId: 'project-1',
+        tagIds: ['tag-2'],
+      },
+    ])
+
+    organization.selectedProjectId = 'project-1'
+    organization.selectedTagId = 'tag-1'
+
+    expect(store.count).toEqual({ all: 1, active: 1, completed: 0 })
   })
 
   it('loads saved tasks and persists later changes', async () => {

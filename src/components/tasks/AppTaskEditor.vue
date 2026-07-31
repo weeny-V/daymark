@@ -4,6 +4,10 @@ import AppDatePicker from '@/shared/ui/AppDatePicker.vue'
 import AppField from '@/shared/ui/AppField.vue'
 import { useForm } from '@/shared/hooks/useForm'
 import type { Task, TaskChanges } from '@/types/Task'
+import { storeToRefs } from 'pinia'
+import { useOrganizationStore } from '@/stores/organization'
+
+const { projects, tags } = storeToRefs(useOrganizationStore())
 
 const props = withDefaults(
   defineProps<{
@@ -27,6 +31,8 @@ const {
   initialState: {
     title: props.task.title,
     dueTo: props.task.dueTo ?? '',
+    projectId: props.task.projectId ?? '',
+    tagIds: props.task.tagIds ?? [],
   },
   validators: {
     title: (value) => {
@@ -44,6 +50,8 @@ const submit = handleSubmit((values) => {
   emit('save', {
     title: values.title.trim(),
     dueTo: values.dueTo || undefined,
+    projectId: values.projectId || undefined,
+    tagIds: values.tagIds,
   })
 })
 </script>
@@ -80,6 +88,26 @@ const submit = handleSubmit((values) => {
       :disabled="disabled"
     />
 
+    <div class="task-editor__organization">
+      <label>
+        <span>Project</span>
+        <select v-model="form.projectId" :disabled="disabled">
+          <option value="">No project</option>
+          <option v-for="project in projects" :key="project.id" :value="project.id">
+            {{ project.name }}
+          </option>
+        </select>
+      </label>
+      <fieldset>
+        <legend>Tags</legend>
+        <label v-for="tag in tags" :key="tag.id">
+          <input v-model="form.tagIds" type="checkbox" :value="tag.id" :disabled="disabled" />
+          {{ tag.name }}
+        </label>
+        <p v-if="!tags.length">Create tags from the Tasks page to assign them here.</p>
+      </fieldset>
+    </div>
+
     <div class="task-editor__actions">
       <button
         v-if="task.dueTo"
@@ -100,9 +128,7 @@ const submit = handleSubmit((values) => {
         >
           Cancel
         </button>
-        <button class="task-editor__save" type="submit" :disabled="disabled">
-          Save changes
-        </button>
+        <button class="task-editor__save" type="submit" :disabled="disabled">Save changes</button>
       </div>
     </div>
   </form>
@@ -121,6 +147,48 @@ const submit = handleSubmit((values) => {
   justify-content: space-between;
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
+}
+
+.task-editor__organization {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.task-editor__organization > label > span,
+.task-editor__organization legend {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.task-editor__organization select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-2);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+.task-editor__organization fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.task-editor__organization fieldset label {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  min-height: 2.75rem;
+}
+.task-editor__organization fieldset p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
 }
 
 .task-editor__primary-actions {
@@ -202,6 +270,9 @@ const submit = handleSubmit((values) => {
 }
 
 @media (max-width: 480px) {
+  .task-editor__organization {
+    grid-template-columns: 1fr;
+  }
   .task-editor__actions {
     display: grid;
     grid-template-columns: 1fr;

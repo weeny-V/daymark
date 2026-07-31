@@ -7,11 +7,15 @@ export type Task = {
   createdAt: string
   priority?: TaskPriority
   dueTo?: string
+  projectId?: string
+  tagIds?: string[]
 }
 
 export type TaskChanges = {
   title?: string
   dueTo?: string
+  projectId?: string
+  tagIds?: string[]
 }
 
 export type TaskFilter = 'all' | 'active' | 'completed'

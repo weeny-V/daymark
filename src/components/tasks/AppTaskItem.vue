@@ -3,6 +3,7 @@ import type { Task } from '@/types/Task.js'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '@/stores/settings'
 import { formatDate } from '@/shared/utils/date'
+import { useOrganizationStore } from '@/stores/organization'
 
 defineProps<{
   task: Task
@@ -15,6 +16,7 @@ defineEmits<{
 }>()
 
 const { dateFormat } = storeToRefs(useSettingsStore())
+const organization = useOrganizationStore()
 
 const priorityLabels = {
   low: 'Low priority',
@@ -44,6 +46,15 @@ const priorityLabels = {
         <span v-if="task.priority" class="task-item__priority">
           {{ priorityLabels[task.priority] }}
         </span>
+        <span v-if="task.projectId"
+          >Project
+          {{
+            organization.projects.find((item) => item.id === task.projectId)?.name ?? 'Deleted'
+          }}</span
+        >
+        <span v-for="tagId in task.tagIds" :key="tagId"
+          >Tag {{ organization.tags.find((item) => item.id === tagId)?.name ?? 'Deleted' }}</span
+        >
         <span v-if="task.dueTo" class="task-item__due-date">
           Due
           <time :datetime="task.dueTo">{{ formatDate(task.dueTo, dateFormat) }}</time>

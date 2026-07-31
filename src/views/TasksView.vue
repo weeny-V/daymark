@@ -5,16 +5,20 @@ import AppSelectField from '../shared/ui/AppSelectField.vue'
 import AppTaskItem from '../components/tasks/AppTaskItem.vue'
 import AppTasksList from '../components/tasks/AppTasksList.vue'
 import { useForm } from '@/shared/hooks/useForm.js'
-import AppTasksEmptyState from "@/components/tasks/AppTasksEmptyState.vue";
-import {useTasksStore} from "@/stores/tasks.ts";
-import {storeToRefs} from "pinia";
-import AppDatePicker from "@/shared/ui/AppDatePicker.vue";
-import { compareDateStrings } from "@/shared/utils/date.ts";
+import AppTasksEmptyState from '@/components/tasks/AppTasksEmptyState.vue'
+import { useTasksStore } from '@/stores/tasks.ts'
+import { storeToRefs } from 'pinia'
+import AppDatePicker from '@/shared/ui/AppDatePicker.vue'
+import { compareDateStrings } from '@/shared/utils/date.ts'
 import AppTaskEditDialog from '@/components/tasks/AppTaskEditDialog.vue'
 import { computed, ref } from 'vue'
+import TaskOrganizationPanel from '@/components/tasks/TaskOrganizationPanel.vue'
+import { useOrganizationStore } from '@/stores/organization'
 
 const tasksStore = useTasksStore()
+const organizationStore = useOrganizationStore()
 const { count, filteredTasks, selectedFilter } = storeToRefs(tasksStore)
+const { projects, tags, selectedProjectId, selectedTagId } = storeToRefs(organizationStore)
 const { addTask, deleteTask, toggleTask } = tasksStore
 const editingTaskId = ref<string | null>(null)
 const editingTask = computed(
@@ -35,7 +39,7 @@ const {
 } = useForm({
   initialState: {
     title: '',
-    dueTo: ''
+    dueTo: '',
   },
   validators: {
     title: (value) => {
@@ -45,7 +49,7 @@ const {
       if (value && compareDateStrings(value) < 0) {
         return 'Due date must be today or later'
       }
-    }
+    },
   },
 })
 
@@ -56,6 +60,19 @@ const submitTask = handleSubmit((values) => {
 const openEditor = (taskId: string) => {
   editingTaskId.value = taskId
 }
+const filterSummary = computed(() => {
+  const status =
+    selectedFilter.value === 'all'
+      ? 'All'
+      : selectedFilter.value === 'active'
+        ? 'Active'
+        : 'Completed'
+  const project = projects.value.find((item) => item.id === selectedProjectId.value)?.name
+  const tag = tags.value.find((item) => item.id === selectedTagId.value)?.name
+  return [`${status} tasks`, project && `project ${project}`, tag && `tag ${tag}`]
+    .filter(Boolean)
+    .join(', ')
+})
 </script>
 
 <template>
@@ -98,7 +115,9 @@ const openEditor = (taskId: string) => {
       <AppButton type="submit">Add task</AppButton>
     </form>
 
-    <div class="task-filter">
+    <TaskOrganizationPanel />
+
+    <div class="task-filters" aria-label="Task filters">
       <AppSelectField>
         <template #label>Show tasks</template>
 
@@ -108,15 +127,35 @@ const openEditor = (taskId: string) => {
           <option value="completed">Completed tasks</option>
         </select>
       </AppSelectField>
+      <AppSelectField>
+        <template #label>Project</template>
+        <select v-model="selectedProjectId" aria-label="Filter tasks by project">
+          <option value="all">All projects</option>
+          <option v-for="project in projects" :key="project.id" :value="project.id">
+            {{ project.name }}
+          </option>
+        </select>
+      </AppSelectField>
+      <AppSelectField>
+        <template #label>Tag</template>
+        <select v-model="selectedTagId" aria-label="Filter tasks by tag">
+          <option value="all">All tags</option>
+          <option v-for="tag in tags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
+        </select>
+      </AppSelectField>
     </div>
 
-    <AppTasksList>
-      <template #summary>ALL: {{count.all}}, ACTIVE: {{ count.active }}, COMPLETED: {{ count.completed }}</template>
+    <p class="filter-summary" role="status">
+      Showing {{ filteredTasks.length }}: {{ filterSummary }}
+    </p>
 
-      <AppTasksEmptyState
-        :tasks="filteredTasks"
-        :selected-filter="selectedFilter"
-      />
+    <AppTasksList>
+      <template #summary
+        >ALL: {{ count.all }}, ACTIVE: {{ count.active }}, COMPLETED:
+        {{ count.completed }}</template
+      >
+
+      <AppTasksEmptyState :tasks="filteredTasks" :selected-filter="selectedFilter" />
 
       <AppTaskItem
         v-for="task in filteredTasks"
@@ -166,9 +205,17 @@ h1 {
   width: 100%;
 }
 
-.task-filter {
-  width: min(100%, 15rem);
-  margin: var(--space-6) 0 0 auto;
+.task-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.filter-summary {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
 }
 
 @media (min-width: 700px) {
@@ -183,8 +230,8 @@ h1 {
 }
 
 @media (max-width: 600px) {
-  .task-filter {
-    width: 100%;
+  .task-filters {
+    grid-template-columns: 1fr;
   }
 }
 </style>

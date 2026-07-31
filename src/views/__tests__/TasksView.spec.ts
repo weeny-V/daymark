@@ -4,11 +4,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import axe from 'axe-core'
 import TasksView from '@/views/TasksView.vue'
 import { useTasksStore } from '@/stores/tasks'
+import { useOrganizationStore } from '@/stores/organization'
 
 const mountTasksView = () => {
   const pinia = createPinia()
   setActivePinia(pinia)
   useTasksStore().initialize()
+  useOrganizationStore().initialize()
 
   return mount(TasksView, {
     global: {
@@ -60,6 +62,55 @@ describe('TasksView', () => {
 
     expect(store.tasks[0]).toMatchObject({ title: 'Updated task', dueTo: '2026-08-12' })
     expect(wrapper.find('dialog').exists()).toBe(false)
+  })
+
+  it('manages organization, assigns it, and composes filters', async () => {
+    const wrapper = mountTasksView()
+    const tasks = useTasksStore()
+    const organization = useOrganizationStore()
+    organization.replaceAll({
+      version: 1,
+      projects: [
+        { id: 'project-1', name: 'Work' },
+        { id: 'project-2', name: 'Home' },
+      ],
+      tags: [{ id: 'tag-1', name: 'Focus' }],
+    })
+    tasks.replaceAll([
+      {
+        id: 'one',
+        title: 'Matching',
+        completed: false,
+        createdAt: '2026-08-01T08:00:00.000Z',
+        projectId: 'project-1',
+        tagIds: ['tag-1'],
+      },
+      {
+        id: 'two',
+        title: 'Wrong project',
+        completed: false,
+        createdAt: '2026-08-01T08:00:00.000Z',
+        projectId: 'project-2',
+        tagIds: ['tag-1'],
+      },
+      {
+        id: 'three',
+        title: 'Completed',
+        completed: true,
+        createdAt: '2026-08-01T08:00:00.000Z',
+        projectId: 'project-1',
+        tagIds: ['tag-1'],
+      },
+    ])
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('select[aria-label="Filter tasks"]').setValue('active')
+    await wrapper.get('select[aria-label="Filter tasks by project"]').setValue('project-1')
+    await wrapper.get('select[aria-label="Filter tasks by tag"]').setValue('tag-1')
+
+    expect(wrapper.text()).toContain('Matching')
+    expect(wrapper.text()).not.toContain('Wrong project')
+    expect(wrapper.text()).toContain('Active tasks, project Work, tag Focus')
   })
 
   it('has no critical automated accessibility violations', async () => {
