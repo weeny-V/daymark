@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AppTaskItem from '@/components/tasks/AppTaskItem.vue'
 import type { Task } from '@/types/Task'
+import { useTasksStore } from '@/stores/tasks'
 
 const task: Task = {
   id: 'task-1',
@@ -62,5 +63,67 @@ describe('AppTaskItem', () => {
     const wrapper = mountTaskItem()
 
     expect(wrapper.find('.task-item__due-date').exists()).toBe(false)
+  })
+
+  it('shows the completion rule and keyboard-operable ordering controls', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const taskWithSubtask: Task = {
+      ...task,
+      order: 1000,
+      subtasks: [
+        {
+          id: 'subtask-1',
+          title: 'Draft outline',
+          completed: false,
+          createdAt: '2026-08-01T08:00:00.000Z',
+          order: 1000,
+        },
+      ],
+    }
+    const wrapper = mount(AppTaskItem, {
+      props: { task: taskWithSubtask, manageSubtasks: true, canMoveDown: true },
+      global: { plugins: [pinia] },
+    })
+
+    expect(wrapper.get('.task-item__checkbox').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Complete all 1 active subtasks')
+    await wrapper.get(`button[aria-label="Move ${task.title} down"]`).trigger('click')
+    expect(wrapper.emitted('move')).toEqual([[task.id, 'down']])
+    expect(
+      wrapper.get('button[aria-label="Move Draft outline up"]').attributes('disabled'),
+    ).toBeDefined()
+  })
+
+  it('shows a subtask as text until Edit opens a dialog', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = useTasksStore()
+    store.replaceAll([
+      {
+        ...task,
+        subtasks: [
+          {
+            id: 'subtask-1',
+            title: 'Draft outline',
+            completed: false,
+            createdAt: '2026-08-01T08:00:00.000Z',
+            order: 1000,
+          },
+        ],
+      },
+    ])
+    const wrapper = mount(AppTaskItem, {
+      props: { task: store.tasks[0]!, manageSubtasks: true },
+      global: { plugins: [pinia] },
+    })
+
+    expect(wrapper.find('#subtask-subtask-1').exists()).toBe(false)
+    await wrapper.get('button[aria-label="Edit Draft outline"]').trigger('click')
+    await wrapper.get('#subtask-edit-title').setValue('Draft agenda')
+    await wrapper.get('#subtask-edit-form').trigger('submit')
+
+    expect(store.tasks[0]?.subtasks?.[0]?.title).toBe('Draft agenda')
+    expect(wrapper.find('dialog').exists()).toBe(false)
   })
 })

@@ -60,6 +60,13 @@ const submitTask = handleSubmit((values) => {
 const openEditor = (taskId: string) => {
   editingTaskId.value = taskId
 }
+const moveTask = (taskId: string, direction: 'up' | 'down') => {
+  tasksStore.moveTask(
+    taskId,
+    direction,
+    filteredTasks.value.map((task) => task.id),
+  )
+}
 const filterSummary = computed(() => {
   const status =
     selectedFilter.value === 'all'
@@ -158,12 +165,16 @@ const filterSummary = computed(() => {
       <AppTasksEmptyState :tasks="filteredTasks" :selected-filter="selectedFilter" />
 
       <AppTaskItem
-        v-for="task in filteredTasks"
+        v-for="(task, index) in filteredTasks"
         :key="task.id"
         :task="task"
+        manage-subtasks
+        :can-move-up="index > 0"
+        :can-move-down="index < filteredTasks.length - 1"
         @delete="deleteTask"
         @edit="openEditor"
         @toggle="toggleTask"
+        @move="moveTask"
       />
     </AppTasksList>
 

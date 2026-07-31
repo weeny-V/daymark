@@ -139,9 +139,12 @@ const notePreview = computed(() =>
                 <input
                   type="checkbox"
                   :checked="task.completed"
+                  :disabled="!task.completed && task.subtasks?.some((subtask) => !subtask.completed)"
+                  :aria-describedby="task.subtasks?.some((subtask) => !subtask.completed) ? `today-task-${task.id}-rule` : undefined"
                   @change="tasksStore.toggleTask(task.id)"
                 />
                 <span>{{ task.title }} <small>Overdue</small></span>
+                <span v-if="task.subtasks?.some((subtask) => !subtask.completed)" :id="`today-task-${task.id}-rule`" class="sr-only">Complete all subtasks first.</span>
               </label>
             </li>
           </ul>
@@ -155,9 +158,12 @@ const notePreview = computed(() =>
                 <input
                   type="checkbox"
                   :checked="task.completed"
+                  :disabled="!task.completed && task.subtasks?.some((subtask) => !subtask.completed)"
+                  :aria-describedby="task.subtasks?.some((subtask) => !subtask.completed) ? `today-task-${task.id}-rule` : undefined"
                   @change="tasksStore.toggleTask(task.id)"
                 />
                 <span :class="{ completed: task.completed }">{{ task.title }}</span>
+                <span v-if="task.subtasks?.some((subtask) => !subtask.completed)" :id="`today-task-${task.id}-rule`" class="sr-only">Complete all subtasks first.</span>
               </label>
             </li>
           </ul>
