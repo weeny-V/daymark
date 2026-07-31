@@ -68,7 +68,7 @@ const router = createRouter({
       },
     },
   ],
-  scrollBehavior: () => ({ top: 0 }),
+  scrollBehavior: (to) => (to.hash ? { el: to.hash } : { top: 0 }),
 })
 
 router.afterEach((to) => {

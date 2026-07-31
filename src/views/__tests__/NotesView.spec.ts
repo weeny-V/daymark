@@ -4,11 +4,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import axe from 'axe-core'
 import NotesView from '@/views/NotesView.vue'
 import { NOTES_STORAGE_KEY, useNotesStore } from '@/stores/notes'
+import { useTasksStore } from '@/stores/tasks'
 
 const mountView = () => {
   const pinia = createPinia()
   setActivePinia(pinia)
   useNotesStore().initialize()
+  useTasksStore().initialize()
   return mount(NotesView, { global: { plugins: [pinia] } })
 }
 
@@ -86,5 +88,50 @@ describe('NotesView', () => {
       rules: { 'color-contrast': { enabled: false } },
     })
     expect(results.violations.filter((violation) => violation.impact === 'critical')).toEqual([])
+  })
+
+  it('filters notes immediately and shows a useful no-results state', async () => {
+    const wrapper = mountView()
+    const store = useNotesStore()
+    const note = store.createNote()
+    store.updateNote(note.id, { title: 'Launch plan', body: 'Review everything' })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('input[type="search"]').setValue('missing')
+    expect(wrapper.text()).toContain('No notes match “missing”')
+
+    await wrapper.get('input[type="search"]').setValue('LAUNCH')
+    expect(wrapper.text()).toContain('Launch plan')
+  })
+
+  it('pins a note and links and unlinks an existing task', async () => {
+    const wrapper = mountView()
+    const note = useNotesStore().createNote()
+    useNotesStore().updateNote(note.id, { title: 'Planning context' })
+    useTasksStore().addTask({ title: 'Prepare demo' })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('.pin-button').trigger('click')
+    expect(useNotesStore().selectedNote?.pinned).toBe(true)
+    expect(wrapper.text()).toContain('Unpin note')
+
+    await wrapper.get('#task-to-link').setValue(useTasksStore().tasks[0]!.id)
+    await wrapper.get('.link-task-control button').trigger('click')
+    expect(useNotesStore().selectedNote?.linkedTaskIds).toEqual([useTasksStore().tasks[0]!.id])
+    expect(wrapper.text()).toContain('Prepare demo')
+
+    await wrapper.get('.linked-task-list button').trigger('click')
+    expect(useNotesStore().selectedNote?.linkedTaskIds).toEqual([])
+  })
+
+  it('renders a removable unavailable link when its task has been deleted', async () => {
+    const wrapper = mountView()
+    const note = useNotesStore().createNote()
+    useNotesStore().linkTask(note.id, 'deleted-task')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Unavailable task')
+    await wrapper.get('button[aria-label="Unlink unavailable task"]').trigger('click')
+    expect(useNotesStore().selectedNote?.linkedTaskIds).toEqual([])
   })
 })

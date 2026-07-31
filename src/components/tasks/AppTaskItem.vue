@@ -24,7 +24,7 @@ const priorityLabels = {
 </script>
 
 <template>
-  <li class="task-item" :class="{ 'task-item--completed': task.completed }">
+  <li :id="`task-${task.id}`" class="task-item" :class="{ 'task-item--completed': task.completed }">
     <label class="task-item__check-target">
       <input
         class="task-item__checkbox"

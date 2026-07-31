@@ -18,6 +18,9 @@ const isNote = (value: unknown): value is Note => {
     typeof note.id === 'string' &&
     typeof note.title === 'string' &&
     typeof note.body === 'string' &&
+    (note.pinned === undefined || typeof note.pinned === 'boolean') &&
+    (note.linkedTaskIds === undefined ||
+      (Array.isArray(note.linkedTaskIds) && note.linkedTaskIds.every((id) => typeof id === 'string'))) &&
     isIsoTimestamp(note.createdAt) &&
     isIsoTimestamp(note.updatedAt)
   )
@@ -33,11 +36,24 @@ export const useNotesStore = defineStore('notes', () => {
   })
   const notes = ref<Note[]>([])
   const selectedNoteId = ref<string>()
+  const searchQuery = ref('')
   let initialized = false
 
   const sortedNotes = computed(() =>
-    [...notes.value].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+    [...notes.value].sort(
+      (a, b) => Number(b.pinned) - Number(a.pinned) || Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+    ),
   )
+  const filteredNotes = computed(() => {
+    const query = searchQuery.value.trim().toLocaleLowerCase()
+    if (!query) return sortedNotes.value
+    return sortedNotes.value.filter(
+      (note) =>
+        note.title.toLocaleLowerCase().includes(query) ||
+        note.body.toLocaleLowerCase().includes(query),
+    )
+  })
+  const pinnedNote = computed(() => sortedNotes.value.find((note) => note.pinned))
   const selectedNote = computed(() =>
     notes.value.find((note) => note.id === selectedNoteId.value),
   )
@@ -46,7 +62,11 @@ export const useNotesStore = defineStore('notes', () => {
 
   const initialize = () => {
     if (initialized) return
-    notes.value = storage.get()
+    notes.value = storage.get().map((note) => ({
+      ...note,
+      pinned: note.pinned ?? false,
+      linkedTaskIds: [...new Set(note.linkedTaskIds ?? [])],
+    }))
     selectedNoteId.value = sortedNotes.value[0]?.id
     initialized = true
   }
@@ -57,6 +77,8 @@ export const useNotesStore = defineStore('notes', () => {
       id: crypto.randomUUID(),
       title: '',
       body: '',
+      pinned: false,
+      linkedTaskIds: [],
       createdAt: timestamp,
       updatedAt: timestamp,
     }
@@ -93,15 +115,45 @@ export const useNotesStore = defineStore('notes', () => {
     return true
   }
 
+  const togglePin = (id: string) => {
+    const note = notes.value.find((item) => item.id === id)
+    if (!note) return false
+    note.pinned = !note.pinned
+    note.updatedAt = new Date().toISOString()
+    return persist()
+  }
+
+  const linkTask = (noteId: string, taskId: string) => {
+    const note = notes.value.find((item) => item.id === noteId)
+    if (!note || !taskId || note.linkedTaskIds.includes(taskId)) return false
+    note.linkedTaskIds.push(taskId)
+    note.updatedAt = new Date().toISOString()
+    return persist()
+  }
+
+  const unlinkTask = (noteId: string, taskId: string) => {
+    const note = notes.value.find((item) => item.id === noteId)
+    if (!note || !note.linkedTaskIds.includes(taskId)) return false
+    note.linkedTaskIds = note.linkedTaskIds.filter((id) => id !== taskId)
+    note.updatedAt = new Date().toISOString()
+    return persist()
+  }
+
   return {
     notes,
     selectedNoteId,
     selectedNote,
     sortedNotes,
+    filteredNotes,
+    pinnedNote,
+    searchQuery,
     initialize,
     createNote,
     selectNote,
     updateNote,
     deleteNote,
+    togglePin,
+    linkTask,
+    unlinkTask,
   }
 })
