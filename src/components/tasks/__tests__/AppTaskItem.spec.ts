@@ -63,4 +63,15 @@ describe('AppTaskItem', () => {
 
     expect(wrapper.find('.task-item__due-date').exists()).toBe(false)
   })
+
+  it('identifies a recurring task without relying on color', () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const wrapper = mount(AppTaskItem, {
+      props: { task: { ...task, dueTo: '2026-08-10', recurrence: { type: 'weekly' } } },
+      global: { plugins: [pinia] },
+    })
+
+    expect(wrapper.get('.task-item__recurrence').text()).toBe('Repeats weekly')
+  })
 })

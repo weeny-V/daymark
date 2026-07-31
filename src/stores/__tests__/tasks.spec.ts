@@ -130,6 +130,96 @@ describe('task store', () => {
     expect(store.count).toEqual({ all: 0, active: 0, completed: 0 })
   })
 
+  it.each([
+    ['daily', { type: 'daily' as const }, '2026-08-01', '2026-08-02'],
+    ['weekly', { type: 'weekly' as const }, '2026-08-01', '2026-08-08'],
+    [
+      'selected weekdays',
+      { type: 'weekdays' as const, weekdays: [1, 3] },
+      '2026-08-01',
+      '2026-08-03',
+    ],
+    [
+      'selected weekday across a week boundary',
+      { type: 'weekdays' as const, weekdays: [5] },
+      '2026-08-01',
+      '2026-08-07',
+    ],
+  ])('creates one next occurrence for a %s rule', (_label, recurrence, dueTo, expectedDueTo) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([{ ...savedTask, dueTo, recurrence }]))
+    const store = createStore()
+    store.initialize()
+
+    store.toggleTask(savedTask.id)
+
+    expect(store.tasks).toHaveLength(2)
+    expect(store.tasks[0]?.completed).toBe(true)
+    expect(store.tasks[1]).toMatchObject({
+      title: savedTask.title,
+      completed: false,
+      dueTo: expectedDueTo,
+      recurrence,
+      generatedFromTaskId: savedTask.id,
+    })
+  })
+
+  it('does not duplicate a generated occurrence after repeated completion or reload', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([{ ...savedTask, dueTo: '2026-08-01', recurrence: { type: 'daily' } }]),
+    )
+    const store = createStore()
+    store.initialize()
+
+    store.toggleTask(savedTask.id)
+    store.toggleTask(savedTask.id)
+    store.toggleTask(savedTask.id)
+    await nextTick()
+    expect(store.tasks).toHaveLength(2)
+
+    const reloadedStore = createStore()
+    reloadedStore.initialize()
+    reloadedStore.toggleTask(savedTask.id)
+    reloadedStore.toggleTask(savedTask.id)
+
+    expect(reloadedStore.tasks).toHaveLength(2)
+  })
+
+  it('creates and removes recurrence rules while leaving non-recurring tasks unchanged', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([savedTask]))
+    const store = createStore()
+    store.initialize()
+
+    expect(store.updateTask(savedTask.id, { recurrence: { type: 'daily' } })).toBe(false)
+    expect(
+      store.updateTask(savedTask.id, {
+        dueTo: '2026-08-01',
+        recurrence: { type: 'weekdays', weekdays: [1, 5] },
+      }),
+    ).toBe(true)
+    expect(store.tasks[0]?.recurrence).toEqual({ type: 'weekdays', weekdays: [1, 5] })
+
+    expect(store.updateTask(savedTask.id, { recurrence: undefined })).toBe(true)
+    store.toggleTask(savedTask.id)
+    expect(store.tasks).toEqual([{ ...savedTask, dueTo: '2026-08-01', completed: true }])
+  })
+
+  it('rejects malformed persisted recurrence rules', () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        { ...savedTask, dueTo: '2026-08-01', recurrence: { type: 'weekdays', weekdays: [] } },
+      ]),
+    )
+    const store = createStore()
+
+    store.initialize()
+
+    expect(store.tasks).toEqual([])
+    expect(warning).toHaveBeenCalled()
+  })
+
   it('shows tasks matching the selected filter', () => {
     localStorage.setItem(
       STORAGE_KEY,

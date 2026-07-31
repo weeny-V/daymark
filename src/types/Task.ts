@@ -1,5 +1,10 @@
 export type TaskPriority = 'low' | 'medium' | 'high'
 
+export type TaskRecurrence =
+  | { type: 'daily' }
+  | { type: 'weekly' }
+  | { type: 'weekdays'; weekdays: number[] }
+
 export type Task = {
   title: string
   completed: boolean
@@ -9,6 +14,8 @@ export type Task = {
   dueTo?: string
   projectId?: string
   tagIds?: string[]
+  recurrence?: TaskRecurrence
+  generatedFromTaskId?: string
 }
 
 export type TaskChanges = {
@@ -16,6 +23,7 @@ export type TaskChanges = {
   dueTo?: string
   projectId?: string
   tagIds?: string[]
+  recurrence?: TaskRecurrence
 }
 
 export type TaskFilter = 'all' | 'active' | 'completed'

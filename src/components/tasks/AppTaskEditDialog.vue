@@ -29,7 +29,7 @@ const removeDueDate = () => {
     v-if="task"
     v-model:open="open"
     title="Edit task"
-    description="Update the task title, due date, or both."
+    description="Update the task title, due date, and recurrence."
   >
     <AppTaskEditor
       :key="task.id"
