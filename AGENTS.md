@@ -32,7 +32,7 @@ Before implementing a backlog task:
 The application currently includes:
 
 - A sticky `AppHeader` with Daymark branding and account actions.
-- A reusable `AppNavigation` rendered as a desktop sidebar and mobile bottom bar.
+- A reusable `AppNavigation` rendered as a seven-link desktop sidebar and a mobile bottom bar with Today, Tasks, Habits, Focus, plus an accessible More sheet for Upcoming, Notes, and Settings.
 - A Today dashboard with task quick capture, overdue and due-today tasks, scheduled habits, a pinned-note shortcut, and combined daily progress.
 - Task creation, completion, filtering, deletion, priorities, and due dates.
 - An Upcoming view that groups incomplete tasks by future due date.
@@ -141,7 +141,7 @@ Check layouts at these representative widths:
 - 768 px - tablet/small desktop boundary
 - 1440 px - desktop
 
-The primary navigation is a fixed bottom bar below 768 px and a sticky sidebar at 768 px and above.
+The primary navigation is a sticky seven-link sidebar at 768 px and above. Below 768 px it becomes a fixed bottom bar with four primary destinations (Today, Tasks, Habits, and Focus) plus a More control that opens an accessible bottom sheet containing Upcoming, Notes, and Settings.
 
 ## State and local data
 
