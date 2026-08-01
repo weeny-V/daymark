@@ -113,7 +113,7 @@ describe('NotesView', () => {
 
     await wrapper.get('.pin-button').trigger('click')
     expect(useNotesStore().selectedNote?.pinned).toBe(true)
-    expect(wrapper.text()).toContain('Unpin note')
+    expect(wrapper.get('.pin-button').attributes('aria-label')).toBe('Unpin note')
 
     await wrapper.get('#task-to-link').setValue(useTasksStore().tasks[0]!.id)
     await wrapper.get('.link-task-control button').trigger('click')

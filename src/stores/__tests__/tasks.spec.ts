@@ -202,7 +202,9 @@ describe('task store', () => {
 
     expect(store.updateTask(savedTask.id, { recurrence: undefined })).toBe(true)
     store.toggleTask(savedTask.id)
-    expect(store.tasks).toEqual([{ ...savedTask, dueTo: '2026-08-01', completed: true }])
+    expect(store.tasks).toEqual([
+      { ...normalizedSavedTask, dueTo: '2026-08-01', completed: true },
+    ])
   })
 
   it('rejects malformed persisted recurrence rules', () => {
@@ -273,6 +275,10 @@ describe('task store', () => {
     expect(
       [...store.tasks[0]!.subtasks!].sort((a, b) => a.order - b.order).map((item) => item.id),
     ).toEqual([second!.id, first!.id])
+    expect(store.reorderSubtask(savedTask.id, first!.id, second!.id)).toBe(true)
+    expect(
+      [...store.tasks[0]!.subtasks!].sort((a, b) => a.order - b.order).map((item) => item.id),
+    ).toEqual([first!.id, second!.id])
     expect(store.toggleSubtask(savedTask.id, first!.id)).toBe(true)
     expect(store.deleteSubtask(savedTask.id, second!.id)).toBe(true)
     expect(store.tasks[0]!.subtasks).toMatchObject([
@@ -302,11 +308,12 @@ describe('task store', () => {
     expect(store.tasks.map((task) => task.order)).toEqual([1000, 2000])
     expect(store.tasks.every((task) => Array.isArray(task.subtasks))).toBe(true)
     expect(store.moveTask('second', 'up')).toBe(true)
+    expect(store.reorderTask(savedTask.id, 'second')).toBe(true)
     await nextTick()
 
     const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY)!) as Task[]
-    expect(persisted.find((task) => task.id === 'second')?.order).toBe(1000)
-    expect(store.filteredTasks.map((task) => task.id)).toEqual(['second', savedTask.id])
+    expect(persisted.find((task) => task.id === savedTask.id)?.order).toBe(1000)
+    expect(store.filteredTasks.map((task) => task.id)).toEqual([savedTask.id, 'second'])
   })
 
   it('loads saved tasks and persists later changes', async () => {

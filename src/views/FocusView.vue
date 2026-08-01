@@ -203,7 +203,9 @@ onBeforeUnmount(() => {
             :aria-label="`Delete ${session.mode} session from ${dayjs(session.completedAt).format('MMMM D')}`"
             @click="focusStore.deleteSession(session.id)"
           >
-            Delete
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+            </svg>
           </button>
         </li>
       </ul>
@@ -369,6 +371,25 @@ h2 {
 .history li span {
   color: var(--color-text-muted);
   font-size: 0.875rem;
+}
+.history li > button {
+  display: grid;
+  width: 2.75rem;
+  padding: 0;
+  color: #b42318;
+  place-items: center;
+}
+.history li > button:hover {
+  background: #fff0ef;
+  border-color: color-mix(in srgb, #b42318 35%, var(--color-control-border));
+}
+.history li > button svg {
+  width: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 @media (max-width: 760px) {
   .focus-layout {

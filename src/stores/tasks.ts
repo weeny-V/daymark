@@ -223,6 +223,34 @@ export const useTasksStore = defineStore('tasks', () => {
     return moveByOrder(scope as (Task & { order: number })[], id, direction)
   }
 
+  const reorderByOrder = <T extends { id: string; order: number }>(
+    items: T[],
+    id: string,
+    targetId: string,
+    position: 'before' | 'after' = 'before',
+  ) => {
+    if (id === targetId) return false
+    const ordered = [...items].sort((a, b) => a.order - b.order)
+    const sourceIndex = ordered.findIndex((item) => item.id === id)
+    if (sourceIndex < 0 || !ordered.some((item) => item.id === targetId)) return false
+    const [source] = ordered.splice(sourceIndex, 1)
+    const targetIndex = ordered.findIndex((item) => item.id === targetId)
+    const insertionIndex = position === 'after' ? targetIndex + 1 : targetIndex
+    ordered.splice(insertionIndex, 0, source!)
+    ordered.forEach((item, index) => (item.order = (index + 1) * 1000))
+    return true
+  }
+
+  const reorderTask = (
+    id: string,
+    targetId: string,
+    scopeIds?: string[],
+    position: 'before' | 'after' = 'before',
+  ) => {
+    const scope = scopeIds ? tasks.value.filter((task) => scopeIds.includes(task.id)) : tasks.value
+    return reorderByOrder(scope as (Task & { order: number })[], id, targetId, position)
+  }
+
   const addSubtask = (taskId: string, title: string) => {
     const task = tasks.value.find((item) => item.id === taskId)
     const normalized = title.trim()
@@ -267,6 +295,16 @@ export const useTasksStore = defineStore('tasks', () => {
   const moveSubtask = (taskId: string, subtaskId: string, direction: 'up' | 'down') => {
     const subtasks = tasks.value.find((task) => task.id === taskId)?.subtasks
     return subtasks ? moveByOrder(subtasks, subtaskId, direction) : false
+  }
+
+  const reorderSubtask = (
+    taskId: string,
+    subtaskId: string,
+    targetId: string,
+    position: 'before' | 'after' = 'before',
+  ) => {
+    const subtasks = tasks.value.find((task) => task.id === taskId)?.subtasks
+    return subtasks ? reorderByOrder(subtasks, subtaskId, targetId, position) : false
   }
 
   const replaceAll = (value: Task[]) => {
@@ -354,9 +392,12 @@ export const useTasksStore = defineStore('tasks', () => {
     initialize,
     replaceAll,
     moveTask,
+    reorderTask,
     moveSubtask,
+    reorderSubtask,
     tasks,
     toggleTask,
+    nextDueDate,
     toggleSubtask,
     updateTask,
     updateSubtask,

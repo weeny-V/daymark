@@ -180,7 +180,9 @@ const scheduleLabel = (habit: Habit) =>
             </div>
             <div class="habit-card__actions">
               <button type="button" :aria-label="`Edit ${habit.name}`" @click="openEdit(habit)">
-                Edit
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20ZM14.5 6.7l2.8 2.8" />
+                </svg>
               </button>
               <button
                 class="danger"
@@ -188,7 +190,9 @@ const scheduleLabel = (habit: Habit) =>
                 :aria-label="`Delete ${habit.name}`"
                 @click="removeHabit(habit)"
               >
-                Delete
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+                </svg>
               </button>
             </div>
           </div>
@@ -437,8 +441,28 @@ h3 {
   font-weight: 700;
   cursor: pointer;
 }
+.habit-card__actions button {
+  display: grid;
+  width: 2.75rem;
+  padding: 0;
+  place-items: center;
+}
+.habit-card__actions button:hover {
+  background: var(--color-primary-soft);
+}
+.habit-card__actions button svg {
+  width: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
 .habit-card__actions .danger {
   color: #b42318;
+}
+.habit-card__actions .danger:hover {
+  background: #fff0ef;
 }
 .streak {
   margin: var(--space-5) 0;

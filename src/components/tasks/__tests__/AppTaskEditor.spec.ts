@@ -23,7 +23,8 @@ describe('AppTaskEditor', () => {
     const wrapper = mountEditor()
 
     await wrapper.get('input[name="editTitle"]').setValue('Present the demo')
-    await wrapper.get('input[name="editDueTo"]').setValue('2026-08-12')
+    await wrapper.get('.date-picker__trigger').trigger('click')
+    await wrapper.get('button[aria-label="Wednesday, August 12, 2026"]').trigger('click')
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('save')).toEqual([
@@ -72,7 +73,8 @@ describe('AppTaskEditor', () => {
   it('creates, edits, and removes a recurrence rule', async () => {
     const wrapper = mountEditor()
 
-    await wrapper.get('select[name="recurrenceType"]').setValue('weekdays')
+    await wrapper.get('.select-dropdown__trigger').trigger('click')
+    await wrapper.findAll('[role="option"]')[3]!.trigger('click')
     const weekdayInputs = wrapper.findAll('.recurrence-fields__weekdays input')
     await weekdayInputs[0]!.setValue(true)
     await weekdayInputs[2]!.setValue(true)
@@ -82,15 +84,17 @@ describe('AppTaskEditor', () => {
       recurrence: { type: 'weekdays', weekdays: [1, 3] },
     })
 
-    await wrapper.get('select[name="recurrenceType"]').setValue('')
+    await wrapper.get('.select-dropdown__trigger').trigger('click')
+    await wrapper.findAll('[role="option"]')[0]!.trigger('click')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('save')?.[1]?.[0]).toMatchObject({ recurrence: undefined })
   })
 
   it('requires a due date and at least one day for recurrence', async () => {
     const wrapper = mountEditor()
-    await wrapper.get('input[name="editDueTo"]').setValue('')
-    await wrapper.get('select[name="recurrenceType"]').setValue('weekdays')
+    await wrapper.get('button[aria-label="Clear due date"]').trigger('click')
+    await wrapper.get('.select-dropdown__trigger').trigger('click')
+    await wrapper.findAll('[role="option"]')[3]!.trigger('click')
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('save')).toBeUndefined()

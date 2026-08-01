@@ -77,15 +77,44 @@ const remove = (kind: 'project' | 'tag', id: string) => {
                   : (newTag = ($event.target as HTMLInputElement).value)
               "
             />
-            <button type="submit">Add</button>
+            <button
+              class="organization__icon-button organization__add-button"
+              type="submit"
+              :aria-label="`Add ${kind}`"
+              :title="`Add ${kind}`"
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M10 4v12M4 10h12" />
+              </svg>
+            </button>
           </div>
         </form>
         <ul>
           <li v-for="item in kind === 'project' ? projects : tags" :key="item.id">
             <strong>{{ item.name }}</strong>
             <div class="organization__item-actions">
-              <button type="button" @click="openEdit(kind, item.id, item.name)">Edit</button>
-              <button type="button" @click="remove(kind, item.id)">Delete</button>
+              <button
+                class="organization__icon-button"
+                type="button"
+                :aria-label="`Edit ${kind} ${item.name}`"
+                :title="`Edit ${kind}`"
+                @click="openEdit(kind, item.id, item.name)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20ZM14.5 6.7l2.8 2.8" />
+                </svg>
+              </button>
+              <button
+                class="organization__icon-button organization__delete-button"
+                type="button"
+                :aria-label="`Delete ${kind} ${item.name}`"
+                :title="`Delete ${kind}`"
+                @click="remove(kind, item.id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+                </svg>
+              </button>
             </div>
           </li>
         </ul>
@@ -179,7 +208,7 @@ h3 {
 }
 .organization__create div {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
 }
 .organization input {
@@ -224,6 +253,29 @@ li {
 .organization__item-actions {
   display: flex;
   gap: var(--space-2);
+}
+.organization .organization__icon-button {
+  display: grid;
+  width: 2.75rem;
+  padding: 0;
+  place-items: center;
+}
+.organization__icon-button svg {
+  width: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.organization__icon-button:hover {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+.organization .organization__delete-button:hover {
+  color: #b42318;
+  background: #fff0ef;
+  border-color: color-mix(in srgb, #b42318 35%, var(--color-control-border));
 }
 .organization__edit-form {
   display: grid;
@@ -301,17 +353,10 @@ li {
 }
 @media (max-width: 440px) {
   .organization__create div {
-    grid-template-columns: 1fr 1fr;
-  }
-  .organization input {
-    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
   li {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .organization__item-actions button {
-    flex: 1;
+    align-items: center;
   }
 }
 </style>

@@ -2,16 +2,19 @@
 import { useTasksStore } from "@/stores/tasks.ts";
 import AppTaskItem from "@/components/tasks/AppTaskItem.vue";
 import { storeToRefs } from "pinia";
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import AppTaskEditDialog from '@/components/tasks/AppTaskEditDialog.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { formatDate, getWeekStartDate } from '@/shared/utils/date'
+import type { Task } from '@/types/Task'
 
 const tasksStore = useTasksStore()
 const { upcoming } = storeToRefs(tasksStore)
 const { deleteTask, toggleTask } = tasksStore
 const { dateFormat, weekStartsOn } = storeToRefs(useSettingsStore())
 const editingTaskId = ref<string | null>(null)
+const completionFeedback = ref<Record<string, string>>({})
+const completionTimers = new Map<string, number>()
 const editingTask = computed(
   () => tasksStore.tasks.find((task) => task.id === editingTaskId.value) ?? null,
 )
@@ -25,6 +28,31 @@ const editDialogOpen = computed({
 const openEditor = (taskId: string) => {
   editingTaskId.value = taskId
 }
+
+const handleToggle = (task: Task) => {
+  if (task.completed || !task.recurrence || !task.dueTo) {
+    toggleTask(task.id)
+    return
+  }
+  const nextDueTo = tasksStore.nextDueDate(task.dueTo, task.recurrence)
+  completionFeedback.value = {
+    ...completionFeedback.value,
+    [task.id]: `Completed. Next occurrence: ${formatDate(nextDueTo, dateFormat.value)}.`,
+  }
+  window.clearTimeout(completionTimers.get(task.id))
+  completionTimers.set(
+    task.id,
+    window.setTimeout(() => {
+      toggleTask(task.id)
+      const next = { ...completionFeedback.value }
+      delete next[task.id]
+      completionFeedback.value = next
+      completionTimers.delete(task.id)
+    }, 1400),
+  )
+}
+
+onBeforeUnmount(() => completionTimers.forEach((timer) => window.clearTimeout(timer)))
 
 const laterWeekGroups = computed(() => {
   const currentWeekStart = getWeekStartDate(undefined, weekStartsOn.value)
@@ -108,9 +136,11 @@ const laterWeekGroups = computed(() => {
             v-for="task in upcoming.overdue"
             :key="task.id"
             :task="task"
+            :completion-pending="Boolean(completionFeedback[task.id])"
+            :completion-message="completionFeedback[task.id]"
             @delete="deleteTask"
             @edit="openEditor"
-            @toggle="toggleTask"
+            @toggle="handleToggle(task)"
           />
         </ul>
       </section>
@@ -139,9 +169,11 @@ const laterWeekGroups = computed(() => {
             v-for="task in upcoming.today"
             :key="task.id"
             :task="task"
+            :completion-pending="Boolean(completionFeedback[task.id])"
+            :completion-message="completionFeedback[task.id]"
             @delete="deleteTask"
             @edit="openEditor"
-            @toggle="toggleTask"
+            @toggle="handleToggle(task)"
           />
         </ul>
       </section>
@@ -173,9 +205,11 @@ const laterWeekGroups = computed(() => {
                 v-for="task in group.tasks"
                 :key="task.id"
                 :task="task"
+                :completion-pending="Boolean(completionFeedback[task.id])"
+                :completion-message="completionFeedback[task.id]"
                 @delete="deleteTask"
                 @edit="openEditor"
-                @toggle="toggleTask"
+                @toggle="handleToggle(task)"
               />
             </ul>
           </li>

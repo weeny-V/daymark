@@ -2,6 +2,7 @@
 import AppButton from '../shared/ui/AppButton.vue'
 import AppField from '../shared/ui/AppField.vue'
 import AppSelectField from '../shared/ui/AppSelectField.vue'
+import AppSelectDropdown from '../shared/ui/AppSelectDropdown.vue'
 import AppTaskItem from '../components/tasks/AppTaskItem.vue'
 import AppTasksList from '../components/tasks/AppTasksList.vue'
 import { useForm } from '@/shared/hooks/useForm.js'
@@ -16,6 +17,7 @@ import TaskOrganizationPanel from '@/components/tasks/TaskOrganizationPanel.vue'
 import { useOrganizationStore } from '@/stores/organization'
 import AppTaskRecurrenceFields from '@/components/tasks/AppTaskRecurrenceFields.vue'
 import type { TaskRecurrence } from '@/types/Task'
+import type { TaskFilter } from '@/types/Task'
 
 const tasksStore = useTasksStore()
 const organizationStore = useOrganizationStore()
@@ -32,6 +34,25 @@ const editDialogOpen = computed({
     if (!open) editingTaskId.value = null
   },
 })
+const selectedFilterModel = computed({
+  get: () => selectedFilter.value,
+  set: (value: string) => {
+    selectedFilter.value = value as TaskFilter
+  },
+})
+const statusFilterOptions = [
+  { value: 'all', label: 'All tasks' },
+  { value: 'active', label: 'Active tasks' },
+  { value: 'completed', label: 'Completed tasks' },
+]
+const projectFilterOptions = computed(() => [
+  { value: 'all', label: 'All projects' },
+  ...projects.value.map((project) => ({ value: project.id, label: project.name })),
+])
+const tagFilterOptions = computed(() => [
+  { value: 'all', label: 'All tags' },
+  ...tags.value.map((tag) => ({ value: tag.id, label: tag.name })),
+])
 
 const {
   state: form,
@@ -84,6 +105,14 @@ const moveTask = (taskId: string, direction: 'up' | 'down') => {
     taskId,
     direction,
     filteredTasks.value.map((task) => task.id),
+  )
+}
+const reorderTask = (taskId: string, targetId: string, position: 'before' | 'after') => {
+  tasksStore.reorderTask(
+    taskId,
+    targetId,
+    filteredTasks.value.map((task) => task.id),
+    position,
   )
 }
 const filterSummary = computed(() => {
@@ -153,27 +182,27 @@ const filterSummary = computed(() => {
       <AppSelectField>
         <template #label>Show tasks</template>
 
-        <select v-model="selectedFilter" aria-label="Filter tasks">
-          <option value="all">All tasks</option>
-          <option value="active">Active tasks</option>
-          <option value="completed">Completed tasks</option>
-        </select>
+        <AppSelectDropdown
+          v-model="selectedFilterModel"
+          :options="statusFilterOptions"
+          aria-label="Filter tasks"
+        />
       </AppSelectField>
       <AppSelectField>
         <template #label>Project</template>
-        <select v-model="selectedProjectId" aria-label="Filter tasks by project">
-          <option value="all">All projects</option>
-          <option v-for="project in projects" :key="project.id" :value="project.id">
-            {{ project.name }}
-          </option>
-        </select>
+        <AppSelectDropdown
+          v-model="selectedProjectId"
+          :options="projectFilterOptions"
+          aria-label="Filter tasks by project"
+        />
       </AppSelectField>
       <AppSelectField>
         <template #label>Tag</template>
-        <select v-model="selectedTagId" aria-label="Filter tasks by tag">
-          <option value="all">All tags</option>
-          <option v-for="tag in tags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
-        </select>
+        <AppSelectDropdown
+          v-model="selectedTagId"
+          :options="tagFilterOptions"
+          aria-label="Filter tasks by tag"
+        />
       </AppSelectField>
     </div>
 
@@ -182,10 +211,20 @@ const filterSummary = computed(() => {
     </p>
 
     <AppTasksList>
-      <template #summary
-        >ALL: {{ count.all }}, ACTIVE: {{ count.active }}, COMPLETED:
-        {{ count.completed }}</template
-      >
+      <template #summary>
+        <span class="task-summary-chip task-summary-chip--all">
+          <span>All</span>
+          <strong>{{ count.all }}</strong>
+        </span>
+        <span class="task-summary-chip task-summary-chip--active">
+          <span>Active</span>
+          <strong>{{ count.active }}</strong>
+        </span>
+        <span class="task-summary-chip task-summary-chip--completed">
+          <span>Completed</span>
+          <strong>{{ count.completed }}</strong>
+        </span>
+      </template>
 
       <AppTasksEmptyState :tasks="filteredTasks" :selected-filter="selectedFilter" />
 
@@ -200,6 +239,7 @@ const filterSummary = computed(() => {
         @edit="openEditor"
         @toggle="toggleTask"
         @move="moveTask"
+        @reorder="reorderTask"
       />
     </AppTasksList>
 

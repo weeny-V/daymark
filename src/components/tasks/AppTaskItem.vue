@@ -5,7 +5,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { formatDate } from '@/shared/utils/date'
 import { useOrganizationStore } from '@/stores/organization'
 import { useTasksStore } from '@/stores/tasks'
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import AppDialog from '@/shared/ui/AppDialog.vue'
 
 const props = withDefaults(
@@ -14,15 +14,24 @@ const props = withDefaults(
     manageSubtasks?: boolean
     canMoveUp?: boolean
     canMoveDown?: boolean
+    completionPending?: boolean
+    completionMessage?: string
   }>(),
-  { manageSubtasks: false, canMoveUp: false, canMoveDown: false },
+  {
+    manageSubtasks: false,
+    canMoveUp: false,
+    canMoveDown: false,
+    completionPending: false,
+    completionMessage: '',
+  },
 )
 
-defineEmits<{
+const emit = defineEmits<{
   delete: [id: string]
   edit: [id: string]
   toggle: [id: string]
   move: [id: string, direction: 'up' | 'down']
+  reorder: [id: string, targetId: string, position: 'before' | 'after']
 }>()
 
 const { dateFormat } = storeToRefs(useSettingsStore())
@@ -32,6 +41,60 @@ const newSubtaskTitle = ref('')
 const editDialogOpen = ref(false)
 const editingSubtask = ref<{ id: string; title: string }>()
 const editError = ref('')
+const taskDropPosition = ref<'before' | 'after' | null>(null)
+const subtaskDropTarget = ref<{ id: string; position: 'before' | 'after' } | null>(null)
+const taskActionsOpen = ref(false)
+const taskActionsMenu = ref<HTMLElement>()
+let dragPointerY: number | null = null
+let autoScrollFrame: number | null = null
+
+const runAutoScroll = () => {
+  const edgeSize = 96
+  const maxSpeed = 18
+  let distance = 0
+  if (dragPointerY !== null && dragPointerY < edgeSize) {
+    distance = -((edgeSize - dragPointerY) / edgeSize) * maxSpeed
+  } else if (dragPointerY !== null && dragPointerY > window.innerHeight - edgeSize) {
+    distance = ((dragPointerY - (window.innerHeight - edgeSize)) / edgeSize) * maxSpeed
+  }
+  if (distance) {
+    window.scrollBy(0, distance)
+    autoScrollFrame = window.requestAnimationFrame(runAutoScroll)
+  } else {
+    autoScrollFrame = null
+  }
+}
+const trackDragPointer = (event: DragEvent) => {
+  dragPointerY = event.clientY
+  const nearEdge = event.clientY < 96 || event.clientY > window.innerHeight - 96
+  if (nearEdge && autoScrollFrame === null) {
+    autoScrollFrame = window.requestAnimationFrame(runAutoScroll)
+  }
+}
+const startPageAutoScroll = () => {
+  document.addEventListener('dragover', trackDragPointer)
+}
+const stopPageAutoScroll = () => {
+  document.removeEventListener('dragover', trackDragPointer)
+  dragPointerY = null
+  if (autoScrollFrame !== null) window.cancelAnimationFrame(autoScrollFrame)
+  autoScrollFrame = null
+}
+const closeTaskActions = () => {
+  taskActionsOpen.value = false
+  document.removeEventListener('pointerdown', closeTaskActionsOnOutsideClick)
+}
+const closeTaskActionsOnOutsideClick = (event: PointerEvent) => {
+  if (!taskActionsMenu.value?.contains(event.target as Node)) closeTaskActions()
+}
+const toggleTaskActions = () => {
+  taskActionsOpen.value = !taskActionsOpen.value
+  if (taskActionsOpen.value) {
+    document.addEventListener('pointerdown', closeTaskActionsOnOutsideClick)
+  } else {
+    document.removeEventListener('pointerdown', closeTaskActionsOnOutsideClick)
+  }
+}
 const incompleteSubtasks = () =>
   props.task.subtasks?.filter((subtask) => !subtask.completed).length ?? 0
 const addSubtask = () => {
@@ -64,16 +127,136 @@ const recurrenceLabel = (task: Task) => {
   if (task.recurrence?.type === 'weekly') return 'Repeats weekly'
   if (task.recurrence?.type === 'weekdays') return 'Repeats on selected weekdays'
 }
+
+const setDragPreview = (event: DragEvent, source?: HTMLElement | null) => {
+  if (!event.dataTransfer || !source) return
+  const preview = source.cloneNode(true) as HTMLElement
+  preview.className = 'task-drag-preview'
+  Object.assign(preview.style, {
+    position: 'fixed',
+    top: '-1000px',
+    left: '-1000px',
+    zIndex: '9999',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    width: 'max-content',
+    maxWidth: '320px',
+    padding: '10px 14px',
+    color: '#fff',
+    background: 'linear-gradient(135deg, #6558d3 0%, #2f6fed 100%)',
+    border: '1px solid rgb(255 255 255 / 35%)',
+    borderRadius: '10px',
+    boxShadow: '0 12px 28px rgb(47 60 130 / 30%)',
+    fontWeight: '700',
+    opacity: '0.94',
+  })
+  preview.querySelectorAll<HTMLElement>('*').forEach((element) => {
+    element.style.color = 'inherit'
+    element.style.background = 'transparent'
+    element.style.textDecoration = 'none'
+  })
+  document.body.append(preview)
+  event.dataTransfer.setDragImage(preview, 20, 20)
+  window.setTimeout(() => preview.remove())
+}
+
+const startTaskDrag = (event: DragEvent) => {
+  startPageAutoScroll()
+  event.dataTransfer?.setData('text/task-id', props.task.id)
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    const preview = (event.currentTarget as HTMLElement)
+      .closest('.task-item')
+      ?.querySelector<HTMLElement>('.task-item__title')
+    setDragPreview(event, preview)
+  }
+}
+const dropTask = (event: DragEvent) => {
+  const sourceId = event.dataTransfer?.getData('text/task-id')
+  if (sourceId && taskDropPosition.value) {
+    emit('reorder', sourceId, props.task.id, taskDropPosition.value)
+  }
+  taskDropPosition.value = null
+}
+const showTaskDropPosition = (event: DragEvent) => {
+  if (!event.dataTransfer?.types.includes('text/task-id')) return
+  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  taskDropPosition.value = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+}
+const leaveTaskDropTarget = (event: DragEvent) => {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) {
+    taskDropPosition.value = null
+  }
+}
+const startSubtaskDrag = (event: DragEvent, subtaskId: string) => {
+  startPageAutoScroll()
+  event.stopPropagation()
+  event.dataTransfer?.setData('text/subtask-id', subtaskId)
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    const preview = (event.currentTarget as HTMLElement)
+      .closest('.subtask-item')
+      ?.querySelector<HTMLElement>('.subtask-item__content')
+    setDragPreview(event, preview)
+  }
+}
+const dropSubtask = (event: DragEvent, targetId: string) => {
+  event.stopPropagation()
+  const sourceId = event.dataTransfer?.getData('text/subtask-id')
+  const position = subtaskDropTarget.value?.position
+  if (sourceId && position) tasksStore.reorderSubtask(props.task.id, sourceId, targetId, position)
+  subtaskDropTarget.value = null
+}
+const showSubtaskDropPosition = (event: DragEvent, targetId: string) => {
+  if (!event.dataTransfer?.types.includes('text/subtask-id')) return
+  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+  subtaskDropTarget.value = { id: targetId, position }
+}
+onBeforeUnmount(() => {
+  stopPageAutoScroll()
+  document.removeEventListener('pointerdown', closeTaskActionsOnOutsideClick)
+})
 </script>
 
 <template>
-  <li :id="`task-${task.id}`" class="task-item" :class="{ 'task-item--completed': task.completed }">
+  <li
+    :id="`task-${task.id}`"
+    class="task-item"
+    :class="{
+      'task-item--completed': task.completed,
+      'task-item--manageable': manageSubtasks,
+      'task-item--drop-before': taskDropPosition === 'before',
+      'task-item--drop-after': taskDropPosition === 'after',
+    }"
+    @dragover.prevent="showTaskDropPosition"
+    @dragleave="leaveTaskDropTarget"
+    @drop.prevent="dropTask"
+  >
+    <button
+      v-if="manageSubtasks"
+      class="task-item__action task-item__drag"
+      type="button"
+      draggable="true"
+      :aria-label="`Reorder ${task.title}. Use arrow keys to move.`"
+      title="Drag to reorder"
+      @dragstart="startTaskDrag"
+      @dragend="stopPageAutoScroll"
+      @keydown.up.prevent="$emit('move', task.id, 'up')"
+      @keydown.down.prevent="$emit('move', task.id, 'down')"
+    >
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M7 4h.01M13 4h.01M7 8h.01M13 8h.01M7 12h.01M13 12h.01M7 16h.01M13 16h.01" />
+      </svg>
+    </button>
+
     <label class="task-item__check-target">
       <input
         class="task-item__checkbox"
         type="checkbox"
-        :checked="task.completed"
-        :disabled="!task.completed && incompleteSubtasks() > 0"
+        :checked="task.completed || completionPending"
+        :disabled="completionPending || (!task.completed && incompleteSubtasks() > 0)"
         :aria-describedby="incompleteSubtasks() > 0 ? `task-${task.id}-completion-rule` : undefined"
         :aria-label="`Mark ${task.title} as ${task.completed ? 'active' : 'complete'}`"
         @change="$emit('toggle', task.id)"
@@ -117,6 +300,12 @@ const recurrenceLabel = (task: Task) => {
       >
         Complete all {{ incompleteSubtasks() }} active subtasks before completing this task.
       </p>
+      <p v-if="completionMessage" class="task-item__completion-feedback" role="status">
+        <span aria-hidden="true">
+          <svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-8" /></svg>
+        </span>
+        {{ completionMessage }}
+      </p>
 
       <section
         v-if="manageSubtasks"
@@ -128,15 +317,28 @@ const recurrenceLabel = (task: Task) => {
           <label :for="`task-${task.id}-new-subtask`">Add a subtask</label>
           <div>
             <input :id="`task-${task.id}-new-subtask`" v-model="newSubtaskTitle" />
-            <button type="submit">Add</button>
+            <button type="submit" :aria-label="`Add subtask to ${task.title}`" title="Add subtask">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M10 4v12M4 10h12" />
+              </svg>
+            </button>
           </div>
         </form>
         <ol v-if="task.subtasks?.length">
           <li
-            v-for="(subtask, index) in [...task.subtasks].sort((a, b) => a.order - b.order)"
+            v-for="subtask in [...task.subtasks].sort((a, b) => a.order - b.order)"
             :key="subtask.id"
             class="subtask-item"
-            :class="{ 'subtask-item--completed': subtask.completed }"
+            :class="{
+              'subtask-item--completed': subtask.completed,
+              'subtask-item--drop-before':
+                subtaskDropTarget?.id === subtask.id && subtaskDropTarget.position === 'before',
+              'subtask-item--drop-after':
+                subtaskDropTarget?.id === subtask.id && subtaskDropTarget.position === 'after',
+            }"
+            @dragover.stop.prevent="showSubtaskDropPosition($event, subtask.id)"
+            @dragleave.stop="subtaskDropTarget = null"
+            @drop.prevent="dropSubtask($event, subtask.id)"
           >
             <label class="subtask-item__check-target">
               <input
@@ -154,30 +356,30 @@ const recurrenceLabel = (task: Task) => {
             </div>
             <div class="subtask-item__actions">
               <button
+                class="subtask-item__drag"
+                type="button"
+                draggable="true"
+                :aria-label="`Reorder ${subtask.title}. Use arrow keys to move.`"
+                title="Drag to reorder"
+                @dragstart="startSubtaskDrag($event, subtask.id)"
+                @dragend="stopPageAutoScroll"
+                @keydown.up.prevent="tasksStore.moveSubtask(task.id, subtask.id, 'up')"
+                @keydown.down.prevent="tasksStore.moveSubtask(task.id, subtask.id, 'down')"
+              >
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M7 5h.01M13 5h.01M7 10h.01M13 10h.01M7 15h.01M13 15h.01" />
+                </svg>
+              </button>
+              <button
+                class="subtask-item__edit"
                 type="button"
                 :aria-label="`Edit ${subtask.title}`"
                 title="Edit"
                 @click="openSubtaskEditor(subtask.id, subtask.title)"
               >
-                Edit
-              </button>
-              <button
-                type="button"
-                :disabled="index === 0"
-                :aria-label="`Move ${subtask.title} up`"
-                title="Move up"
-                @click="tasksStore.moveSubtask(task.id, subtask.id, 'up')"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                :disabled="index === task.subtasks!.length - 1"
-                :aria-label="`Move ${subtask.title} down`"
-                title="Move down"
-                @click="tasksStore.moveSubtask(task.id, subtask.id, 'down')"
-              >
-                ↓
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20ZM14.5 6.7l2.8 2.8" />
+                </svg>
               </button>
               <button
                 class="subtask-item__delete"
@@ -234,61 +436,77 @@ const recurrenceLabel = (task: Task) => {
       </section>
     </div>
 
-    <div class="task-item__actions">
+    <div ref="taskActionsMenu" class="task-item__actions">
       <button
-        v-if="manageSubtasks"
-        class="task-item__action"
+        class="task-item__action task-item__more"
         type="button"
-        :disabled="!canMoveUp"
-        :aria-label="`Move ${task.title} up`"
-        @click="$emit('move', task.id, 'up')"
+        :aria-label="`Actions for ${task.title}`"
+        aria-haspopup="menu"
+        :aria-expanded="taskActionsOpen"
+        @click="toggleTaskActions"
       >
-        ↑
-      </button>
-      <button
-        v-if="manageSubtasks"
-        class="task-item__action"
-        type="button"
-        :disabled="!canMoveDown"
-        :aria-label="`Move ${task.title} down`"
-        @click="$emit('move', task.id, 'down')"
-      >
-        ↓
-      </button>
-      <button
-        class="task-item__action task-item__edit"
-        type="button"
-        :aria-label="`Edit ${task.title}`"
-        @click="$emit('edit', task.id)"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20ZM14.5 6.7l2.8 2.8" />
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M10 4h.01M10 10h.01M10 16h.01" />
         </svg>
       </button>
-
-      <button
-        class="task-item__action task-item__delete"
-        type="button"
-        :aria-label="`Delete ${task.title}`"
-        @click="$emit('delete', task.id)"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
-        </svg>
-      </button>
+      <div v-if="taskActionsOpen" class="task-item__menu" role="menu">
+        <button type="button" role="menuitem" @click="closeTaskActions(); $emit('edit', task.id)">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20ZM14.5 6.7l2.8 2.8" />
+          </svg>
+          Edit
+        </button>
+        <button class="task-item__menu-delete" type="button" role="menuitem" @click="closeTaskActions(); $emit('delete', task.id)">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+          </svg>
+          Delete
+        </button>
+      </div>
     </div>
   </li>
 </template>
 
 <style scoped>
 .task-item {
+  position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
   min-height: 4.5rem;
   padding: var(--space-4) var(--space-5);
   transition: background-color 160ms ease;
+}
+
+.task-item--drop-before::before,
+.task-item--drop-after::after,
+.subtask-item--drop-before::before,
+.subtask-item--drop-after::after {
+  position: absolute;
+  z-index: 4;
+  right: var(--space-3);
+  left: var(--space-3);
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-focus));
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 14%, transparent);
+  content: '';
+  pointer-events: none;
+}
+
+.task-item--drop-before::before,
+.subtask-item--drop-before::before {
+  top: -2px;
+}
+
+.task-item--drop-after::after,
+.subtask-item--drop-after::after {
+  bottom: -2px;
+}
+
+.task-item--manageable {
+  grid-template-columns: auto auto minmax(0, 1fr);
 }
 
 .task-item + .task-item {
@@ -342,6 +560,11 @@ const recurrenceLabel = (task: Task) => {
   overflow-wrap: anywhere;
 }
 
+.task-item__title,
+.task-item__meta {
+  padding-right: 3.25rem;
+}
+
 .task-item__meta {
   display: flex;
   flex-wrap: wrap;
@@ -356,6 +579,71 @@ const recurrenceLabel = (task: Task) => {
   margin: var(--space-2) 0 0;
   color: var(--color-text-muted);
   font-size: 0.75rem;
+}
+.task-item__completion-feedback {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  margin: 0;
+  color: #166534;
+  background: color-mix(in srgb, #ecfdf3 96%, transparent);
+  border: 1px solid #a7e8bc;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 45%);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  backdrop-filter: blur(3px);
+}
+.task-item__completion-feedback span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: #fff;
+  background: #238654;
+  border-radius: 50%;
+  place-items: center;
+  animation: completion-check-pop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+.task-item__completion-feedback svg {
+  width: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+.task-item__completion-feedback path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: completion-check-draw 360ms 180ms ease-out forwards;
+}
+@keyframes completion-check-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes completion-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+:global(:root[data-theme='dark']) .task-item__completion-feedback {
+  color: #a7e8bc;
+  background: #183b2a;
+  border-color: #2d6846;
 }
 .subtasks {
   margin-top: var(--space-4);
@@ -391,6 +679,7 @@ const recurrenceLabel = (task: Task) => {
   font: inherit;
 }
 .subtasks__add button {
+  display: grid;
   min-width: 2.75rem;
   min-height: 2.75rem;
   color: var(--color-primary);
@@ -400,6 +689,14 @@ const recurrenceLabel = (task: Task) => {
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  place-items: center;
+}
+.subtasks__add button svg {
+  width: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
 }
 .subtasks ol {
   display: grid;
@@ -412,6 +709,7 @@ const recurrenceLabel = (task: Task) => {
   overflow: hidden;
 }
 .subtask-item {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--space-2);
@@ -502,6 +800,25 @@ const recurrenceLabel = (task: Task) => {
 .subtask-item__actions button:disabled {
   cursor: not-allowed;
   opacity: 0.35;
+}
+.subtask-item__actions svg {
+  width: 1.2rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.task-item__drag,
+.subtask-item__drag {
+  cursor: grab;
+  touch-action: none;
+}
+
+.task-item__drag:active,
+.subtask-item__drag:active {
+  cursor: grabbing;
 }
 .subtask-item,
 .subtask-item__actions button {
@@ -619,6 +936,10 @@ const recurrenceLabel = (task: Task) => {
 }
 
 .task-item__actions {
+  position: absolute;
+  z-index: 10;
+  top: var(--space-3);
+  right: var(--space-3);
   display: flex;
   gap: var(--space-1);
 }
@@ -647,6 +968,65 @@ const recurrenceLabel = (task: Task) => {
   background: var(--color-primary-soft);
 }
 
+.task-item__more:hover,
+.task-item__more[aria-expanded='true'] {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.task-item__menu {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  display: grid;
+  width: 9rem;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 28px var(--color-shadow);
+}
+
+.task-item__menu button {
+  display: flex;
+  min-height: 2.75rem;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 3px);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.task-item__menu button:hover,
+.task-item__menu button:focus-visible {
+  background: var(--color-surface-soft);
+}
+
+.task-item__menu .task-item__menu-delete {
+  color: #b42318;
+}
+
+.task-item__menu .task-item__menu-delete:hover,
+.task-item__menu .task-item__menu-delete:focus-visible {
+  background: #fff0ef;
+}
+
+.task-item__menu svg {
+  width: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
 .task-item__delete:hover {
   color: #b42318;
   background: #fff0ef;
@@ -661,32 +1041,130 @@ const recurrenceLabel = (task: Task) => {
   stroke-width: 1.8;
 }
 
-@media (max-width: 600px) {
+.task-item > .task-item__drag {
+  display: grid;
+  width: 1.5rem;
+  height: auto;
+  align-self: stretch;
+  margin-block: calc(var(--space-4) * -1);
+  margin-left: calc(var(--space-5) * -1);
+  color: var(--color-text-muted);
+  background: var(--color-surface-soft);
+  border-right: 1px solid var(--color-border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  place-items: center;
+}
+
+.task-item > .task-item__drag:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.task-item > .task-item__drag svg {
+  width: 1.2rem;
+}
+
+@media (max-width: 900px) {
   .task-item {
+    grid-template-columns: auto minmax(0, 1fr);
     gap: var(--space-2);
-    padding-inline: var(--space-4);
+    align-items: start;
+    padding: var(--space-4);
+  }
+
+  .task-item--manageable {
+    grid-template-columns: auto auto minmax(0, 1fr);
   }
 
   .task-item__actions {
-    gap: 0;
+    justify-content: flex-end;
+    width: max-content;
+    padding: 2px;
+    margin-left: 0;
+    background: var(--color-surface-soft);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    gap: 2px;
+  }
+
+  .task-item > .task-item__drag {
+    margin-left: calc(var(--space-4) * -1);
+  }
+
+  .task-item__content,
+  .subtasks,
+  .subtasks__add,
+  .subtasks__add div,
+  .subtasks ol {
+    min-width: 0;
+  }
+
+  .subtasks__add div {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .subtask-item {
     grid-template-columns: auto minmax(0, 1fr);
+    padding-inline: var(--space-2);
   }
+
   .subtask-item__actions {
     grid-column: 2;
+    justify-content: flex-end;
+    width: max-content;
+    padding: 2px;
+    margin-left: auto;
+    background: var(--color-surface-soft);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+
+  .task-item__actions .task-item__action,
+  .subtask-item__actions button {
+    width: 2.5rem;
+    height: 2.5rem;
+    background: var(--color-surface);
+  }
+
+  .subtask-item__content {
     flex-wrap: wrap;
   }
-  .subtask-item__content {
-    align-items: flex-start;
-    flex-direction: column;
+}
+
+@media (max-width: 380px) {
+  .task-item {
+    padding-inline: var(--space-3);
+  }
+
+  .task-item__check-target,
+  .subtask-item__check-target {
+    width: 2.5rem;
+  }
+
+  .task-item__actions,
+  .subtask-item__actions {
+    justify-content: flex-end;
+  }
+
+  .task-item > .task-item__drag {
+    margin-left: calc(var(--space-3) * -1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .task-item {
     transition: none;
+  }
+
+  .task-item__completion-feedback span,
+  .task-item__completion-feedback path {
+    animation: none;
+  }
+
+  .task-item__completion-feedback path {
+    stroke-dashoffset: 0;
   }
 }
 </style>

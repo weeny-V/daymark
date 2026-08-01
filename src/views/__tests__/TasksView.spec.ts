@@ -55,10 +55,13 @@ describe('TasksView', () => {
     store.addTask({ title: 'Original task', dueTo: '2026-08-10' })
     await wrapper.vm.$nextTick()
 
-    await wrapper.get('button[aria-label="Edit Original task"]').trigger('click')
+    await wrapper.get('button[aria-label="Actions for Original task"]').trigger('click')
+    await wrapper.findAll('button[role="menuitem"]')[0]!.trigger('click')
     await wrapper.get('input[name="editTitle"]').setValue('Updated task')
-    await wrapper.get('input[name="editDueTo"]').setValue('2026-08-12')
-    await wrapper.get('form[aria-label="Edit task"]').trigger('submit')
+    const editForm = wrapper.get('form[aria-label="Edit task"]')
+    await editForm.get('.date-picker__trigger').trigger('click')
+    await editForm.get('button[aria-label="Wednesday, August 12, 2026"]').trigger('click')
+    await editForm.trigger('submit')
 
     expect(store.tasks[0]).toMatchObject({ title: 'Updated task', dueTo: '2026-08-12' })
     expect(wrapper.find('dialog').exists()).toBe(false)
@@ -104,9 +107,12 @@ describe('TasksView', () => {
     ])
     await wrapper.vm.$nextTick()
 
-    await wrapper.get('select[aria-label="Filter tasks"]').setValue('active')
-    await wrapper.get('select[aria-label="Filter tasks by project"]').setValue('project-1')
-    await wrapper.get('select[aria-label="Filter tasks by tag"]').setValue('tag-1')
+    await wrapper.get('button[aria-label="Filter tasks"]').trigger('click')
+    await wrapper.findAll('[role="option"]')[1]!.trigger('click')
+    await wrapper.get('button[aria-label="Filter tasks by project"]').trigger('click')
+    await wrapper.findAll('[role="option"]')[1]!.trigger('click')
+    await wrapper.get('button[aria-label="Filter tasks by tag"]').trigger('click')
+    await wrapper.findAll('[role="option"]')[1]!.trigger('click')
 
     expect(wrapper.text()).toContain('Matching')
     expect(wrapper.text()).not.toContain('Wrong project')

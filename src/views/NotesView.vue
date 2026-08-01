@@ -167,13 +167,18 @@ onBeforeUnmount(() => window.clearTimeout(savedTimer))
               class="pin-button"
               type="button"
               :aria-pressed="selectedNote.pinned"
+              :aria-label="selectedNote.pinned ? 'Unpin note' : 'Pin note'"
+              :title="selectedNote.pinned ? 'Unpin note' : 'Pin note'"
               @click="toggleSelectedPin"
             >
-              <span aria-hidden="true">{{ selectedNote.pinned ? '★' : '☆' }}</span>
-              {{ selectedNote.pinned ? 'Unpin note' : 'Pin note' }}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z" />
+              </svg>
             </button>
-            <button class="delete-button" type="button" @click="deleteSelectedNote">
-              Delete note
+            <button class="delete-button" type="button" aria-label="Delete note" title="Delete note" @click="deleteSelectedNote">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" />
+              </svg>
             </button>
           </div>
         </div>
@@ -219,7 +224,9 @@ onBeforeUnmount(() => window.clearTimeout(savedTimer))
                 :aria-label="`Unlink ${linked.task?.title ?? 'unavailable task'}`"
                 @click="removeTaskLink(linked.id)"
               >
-                Unlink
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m9 15-2 2a3 3 0 0 1-4-4l3-3a3 3 0 0 1 4-.2M15 9l2-2a3 3 0 0 1 4 4l-3 3a3 3 0 0 1-4 .2M8 16l8-8" />
+                </svg>
               </button>
             </li>
           </ul>
@@ -234,7 +241,11 @@ onBeforeUnmount(() => window.clearTimeout(savedTimer))
                   {{ task.title }}
                 </option>
               </select>
-              <button type="button" :disabled="!taskToLink" @click="addTaskLink">Link task</button>
+              <button type="button" aria-label="Link task" title="Link task" :disabled="!taskToLink" @click="addTaskLink">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m10 13 4-4M8 16H6a4 4 0 0 1 0-8h3M16 8h2a4 4 0 0 1 0 8h-3" />
+                </svg>
+              </button>
             </div>
           </div>
           <p v-else-if="!tasks.length" class="task-links__empty">
@@ -405,13 +416,30 @@ h2 {
 }
 .delete-button,
 .pin-button {
+  display: grid;
+  width: 2.75rem;
   min-height: 2.75rem;
-  padding: var(--space-2) var(--space-3);
+  padding: 0;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   font-weight: 700;
   cursor: pointer;
+  place-items: center;
+}
+.delete-button svg,
+.pin-button svg,
+.linked-task-list button svg,
+.link-task-control button svg {
+  width: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.pin-button[aria-pressed='true'] svg {
+  fill: currentColor;
 }
 .delete-button {
   color: #b42318;
@@ -547,14 +575,17 @@ h2 {
 }
 .linked-task-list button,
 .link-task-control button {
+  display: grid;
+  width: 2.75rem;
   min-height: 2.75rem;
-  padding: var(--space-2) var(--space-3);
+  padding: 0;
   color: var(--color-primary);
   background: var(--color-surface);
   border: 1px solid var(--color-control-border);
   border-radius: var(--radius-sm);
   font-weight: 700;
   cursor: pointer;
+  place-items: center;
 }
 .missing-task {
   display: inline-flex;

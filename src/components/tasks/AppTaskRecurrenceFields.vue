@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelectDropdown from '@/shared/ui/AppSelectDropdown.vue'
 import AppSelectField from '@/shared/ui/AppSelectField.vue'
 
 defineProps<{ disabled?: boolean; error?: string }>()
@@ -15,18 +16,26 @@ const weekdayOptions = [
   { value: 6, label: 'Sat' },
   { value: 0, label: 'Sun' },
 ]
+
+const recurrenceOptions = [
+  { value: '', label: 'Does not repeat' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'weekdays', label: 'Selected weekdays' },
+]
 </script>
 
 <template>
   <div class="recurrence-fields">
     <AppSelectField>
       <template #label>Repeat</template>
-      <select v-model="recurrenceType" name="recurrenceType" :disabled="disabled">
-        <option value="">Does not repeat</option>
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-        <option value="weekdays">Selected weekdays</option>
-      </select>
+      <AppSelectDropdown
+        v-model="recurrenceType"
+        :options="recurrenceOptions"
+        name="recurrenceType"
+        aria-label="Repeat"
+        :disabled="disabled"
+      />
       <template #message>
         <span v-if="error" role="alert">{{ error }}</span>
         <span v-else>Recurring tasks require a due date.</span>

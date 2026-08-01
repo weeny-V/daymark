@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AppTaskItem from '@/components/tasks/AppTaskItem.vue'
@@ -33,7 +33,8 @@ describe('AppTaskItem', () => {
   it('requests deletion for the selected task', async () => {
     const wrapper = mountTaskItem()
 
-    await wrapper.get(`button[aria-label="Delete ${task.title}"]`).trigger('click')
+    await wrapper.get(`button[aria-label="Actions for ${task.title}"]`).trigger('click')
+    await wrapper.findAll('button[role="menuitem"]')[1]!.trigger('click')
 
     expect(wrapper.emitted('delete')).toEqual([[task.id]])
   })
@@ -41,7 +42,8 @@ describe('AppTaskItem', () => {
   it('requests editing for the selected task', async () => {
     const wrapper = mountTaskItem()
 
-    await wrapper.get(`button[aria-label="Edit ${task.title}"]`).trigger('click')
+    await wrapper.get(`button[aria-label="Actions for ${task.title}"]`).trigger('click')
+    await wrapper.findAll('button[role="menuitem"]')[0]!.trigger('click')
 
     expect(wrapper.emitted('edit')).toEqual([[task.id]])
   })
@@ -76,7 +78,7 @@ describe('AppTaskItem', () => {
     expect(wrapper.get('.task-item__recurrence').text()).toBe('Repeats weekly')
   })
 
-  it('shows the completion rule and keyboard-operable ordering controls', async () => {
+  it('shows the completion rule and keyboard-operable drag handles', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const taskWithSubtask: Task = {
@@ -99,11 +101,26 @@ describe('AppTaskItem', () => {
 
     expect(wrapper.get('.task-item__checkbox').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('Complete all 1 active subtasks')
-    await wrapper.get(`button[aria-label="Move ${task.title} down"]`).trigger('click')
+    const taskHandle = wrapper.get(
+      `button[aria-label="Reorder ${task.title}. Use arrow keys to move."]`,
+    )
+    expect(taskHandle.attributes('draggable')).toBe('true')
+    const setDragImage = vi.fn()
+    await taskHandle.trigger('dragstart', {
+      dataTransfer: { setData: vi.fn(), setDragImage, effectAllowed: '' },
+    })
+    const preview = setDragImage.mock.calls[0]?.[0] as HTMLElement
+    expect(preview.className).toBe('task-drag-preview')
+    expect(preview.textContent).toContain(task.title)
+    expect(preview.style.background).toContain('linear-gradient')
+    await taskHandle.trigger('dragend')
+    await taskHandle.trigger('keydown', { key: 'ArrowDown' })
     expect(wrapper.emitted('move')).toEqual([[task.id, 'down']])
     expect(
-      wrapper.get('button[aria-label="Move Draft outline up"]').attributes('disabled'),
-    ).toBeDefined()
+      wrapper
+        .get('button[aria-label="Reorder Draft outline. Use arrow keys to move."]')
+        .attributes('draggable'),
+    ).toBe('true')
   })
 
   it('shows a subtask as text until Edit opens a dialog', async () => {
@@ -130,11 +147,66 @@ describe('AppTaskItem', () => {
     })
 
     expect(wrapper.find('#subtask-subtask-1').exists()).toBe(false)
-    await wrapper.get('button[aria-label="Edit Draft outline"]').trigger('click')
+    const editButton = wrapper.get('button[aria-label="Edit Draft outline"]')
+    expect(editButton.find('svg').exists()).toBe(true)
+    expect(editButton.text()).toBe('')
+    await editButton.trigger('click')
     await wrapper.get('#subtask-edit-title').setValue('Draft agenda')
     await wrapper.get('#subtask-edit-form').trigger('submit')
 
     expect(store.tasks[0]?.subtasks?.[0]?.title).toBe('Draft agenda')
     expect(wrapper.find('dialog').exists()).toBe(false)
+  })
+
+  it('shows and applies an exact drag insertion position', async () => {
+    const wrapper = mountTaskItem()
+    vi.spyOn(wrapper.element, 'getBoundingClientRect').mockReturnValue({
+      top: 0,
+      height: 100,
+    } as DOMRect)
+
+    await wrapper.trigger('dragover', {
+      clientY: 75,
+      dataTransfer: { types: ['text/task-id'] },
+    })
+    expect(wrapper.classes()).toContain('task-item--drop-after')
+
+    await wrapper.trigger('drop', {
+      dataTransfer: { getData: () => 'task-2' },
+    })
+    expect(wrapper.emitted('reorder')).toEqual([['task-2', task.id, 'after']])
+    expect(wrapper.classes()).not.toContain('task-item--drop-after')
+  })
+
+  it('auto-scrolls near the viewport edge while dragging', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const wrapper = mount(AppTaskItem, {
+      props: { task, manageSubtasks: true },
+      global: { plugins: [pinia] },
+    })
+    const handle = wrapper.get(`button[aria-label="Reorder ${task.title}. Use arrow keys to move."]`)
+    let scrollFrame: FrameRequestCallback | undefined
+    const requestFrame = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        scrollFrame = callback
+        return 1
+      })
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+
+    await handle.trigger('dragstart', {
+      dataTransfer: { setData: vi.fn(), setDragImage: vi.fn(), effectAllowed: '' },
+    })
+    const dragOver = new Event('dragover')
+    Object.defineProperty(dragOver, 'clientY', { value: window.innerHeight - 1 })
+    document.dispatchEvent(dragOver)
+    expect(requestFrame).toHaveBeenCalled()
+    scrollFrame?.(0)
+    expect(scrollBy).toHaveBeenCalledWith(0, expect.any(Number))
+
+    await handle.trigger('dragend')
+    expect(cancelFrame).toHaveBeenCalled()
   })
 })

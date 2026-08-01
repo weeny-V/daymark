@@ -29,9 +29,11 @@ describe('UpcomingView', () => {
       },
     })
 
-    await wrapper.get('button[aria-label="Edit Plan release"]').trigger('click')
+    await wrapper.get('button[aria-label="Actions for Plan release"]').trigger('click')
+    await wrapper.findAll('button[role="menuitem"]')[0]!.trigger('click')
     await wrapper.get('input[name="editTitle"]').setValue('Ship release')
-    await wrapper.get('input[name="editDueTo"]').setValue('2026-07-31')
+    await wrapper.get('.date-picker__trigger').trigger('click')
+    await wrapper.get('button[aria-label="Friday, July 31, 2026"]').trigger('click')
     await wrapper.get('form[aria-label="Edit task"]').trigger('submit')
 
     expect(store.tasks[0]).toMatchObject({ title: 'Ship release', dueTo: '2026-07-31' })
@@ -66,5 +68,34 @@ describe('UpcomingView', () => {
     expect(wrapper.findAll('.later-week__title').map((heading) => heading.text())).toEqual([
       'Week of August 2, 2026',
     ])
+  })
+
+  it('shows recurring completion feedback on the checked task before replacing it', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = useTasksStore()
+    store.initialize()
+    store.addTask({
+      title: 'Weekly planning',
+      dueTo: '2026-08-02',
+      recurrence: { type: 'weekly' },
+    })
+    const wrapper = mount(UpcomingView, {
+      global: {
+        plugins: [pinia],
+        stubs: { RouterLink: { template: '<a><slot /></a>' } },
+      },
+    })
+
+    await wrapper.get('input[aria-label="Mark Weekly planning as complete"]').trigger('change')
+
+    expect(wrapper.get('.task-item__completion-feedback').text()).toContain(
+      'Completed. Next occurrence: August 9, 2026.',
+    )
+    expect(store.tasks).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(1400)
+    expect(store.tasks).toHaveLength(2)
+    expect(store.tasks.find((task) => !task.completed)?.dueTo).toBe('2026-08-09')
   })
 })
