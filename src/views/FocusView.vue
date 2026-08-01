@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import dayjs from 'dayjs'
 import AppButton from '@/shared/ui/AppButton.vue'
@@ -10,12 +10,13 @@ import { useTasksStore } from '@/stores/tasks'
 
 const focusStore = useFocusStore()
 const tasksStore = useTasksStore()
-const { timer, sessions } = storeToRefs(focusStore)
+const { timer, sessions, soundEnabled } = storeToRefs(focusStore)
 const selectedTaskId = ref('')
 const focusMinutes = ref(timer.value.focusMinutes)
 const breakMinutes = ref(timer.value.breakMinutes)
 const durationError = ref('')
 let intervalId: number | undefined
+let audioContext: AudioContext | undefined
 
 const activeTasks = computed(() => tasksStore.tasks.filter((task) => !task.completed))
 const timeLabel = computed(() => {
@@ -44,6 +45,49 @@ const selectMode = (mode: 'focus' | 'break') => {
 }
 
 const handleVisibility = () => focusStore.tick()
+
+const prepareCompletionChime = () => {
+  if (!soundEnabled.value || audioContext || !window.AudioContext) return
+  audioContext = new window.AudioContext()
+}
+
+const startTimer = () => {
+  prepareCompletionChime()
+  focusStore.start(selectedTaskId.value || undefined)
+}
+
+const playCompletionChime = () => {
+  const AudioContextClass = window.AudioContext
+  if (!AudioContextClass) return
+
+  const context = audioContext ?? new AudioContextClass()
+  const gain = context.createGain()
+  gain.gain.setValueAtTime(0.0001, context.currentTime)
+  gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.02)
+  gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 1.2)
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 2.2)
+  gain.connect(context.destination)
+
+  ;[523.25, 659.25].forEach((frequency, index) => {
+    const oscillator = context.createOscillator()
+    oscillator.type = 'sine'
+    oscillator.frequency.value = frequency
+    oscillator.connect(gain)
+    oscillator.start(context.currentTime + index * 0.25)
+    oscillator.stop(context.currentTime + 1.9 + index * 0.25)
+  })
+  window.setTimeout(() => {
+    void context.close()
+    if (audioContext === context) audioContext = undefined
+  }, 2400)
+}
+
+watch(
+  () => sessions.value.length,
+  (length, previousLength) => {
+    if (soundEnabled.value && length > previousLength) playCompletionChime()
+  },
+)
 
 onMounted(() => {
   focusStore.tick()
@@ -103,10 +147,7 @@ onBeforeUnmount(() => {
         </AppSelectField>
 
         <div class="timer-actions">
-          <AppButton
-            v-if="timer.status === 'idle'"
-            @click="focusStore.start(selectedTaskId || undefined)"
-          >
+          <AppButton v-if="timer.status === 'idle'" @click="startTimer">
             Start {{ timer.mode }}
           </AppButton>
           <AppButton v-else-if="timer.status === 'running'" @click="focusStore.pause()">
@@ -132,6 +173,10 @@ onBeforeUnmount(() => {
             <input v-model.number="breakMinutes" type="number" min="1" max="180" step="1" />
           </AppField>
           <p v-if="durationError" class="error" role="alert">{{ durationError }}</p>
+          <label class="sound-control">
+            <input v-model="soundEnabled" type="checkbox" />
+            Play a sound when a session ends
+          </label>
           <AppButton type="submit" :disabled="timer.status !== 'idle'">Save lengths</AppButton>
         </form>
       </section>
@@ -280,6 +325,17 @@ h2 {
   display: grid;
   gap: var(--space-3);
   margin-top: var(--space-5);
+}
+.sound-control {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 2.75rem;
+}
+.sound-control input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--color-primary);
 }
 .error {
   margin: 0;

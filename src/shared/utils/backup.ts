@@ -123,6 +123,7 @@ export const createBackup = (
     focus: structuredClone({
       timer: toRaw(useFocusStore(pinia).timer),
       sessions: toRaw(useFocusStore(pinia).sessions),
+      soundEnabled: useFocusStore(pinia).soundEnabled,
     }),
   },
 })

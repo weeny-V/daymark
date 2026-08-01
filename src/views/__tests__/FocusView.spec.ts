@@ -23,6 +23,7 @@ describe('FocusView', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
     document.body.replaceChildren()
   })
 
@@ -55,6 +56,38 @@ describe('FocusView', () => {
     tasks.deleteTask(taskId)
     await wrapper.vm.$nextTick()
     expect(wrapper.text()).toContain('Task: Deleted task')
+  })
+
+  it('plays an optional chime when a focus or break session completes', async () => {
+    const start = vi.fn()
+    const oscillator = {
+      type: 'sine',
+      frequency: { value: 0 },
+      connect: vi.fn(),
+      start,
+      stop: vi.fn(),
+    }
+    class AudioContextStub {
+      currentTime = 0
+      destination = {}
+      createGain = () => ({
+        gain: {
+          setValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn(),
+        },
+        connect: vi.fn(),
+      })
+      createOscillator = () => oscillator
+      close = vi.fn()
+    }
+    vi.stubGlobal('AudioContext', AudioContextStub)
+
+    const wrapper = mountView()
+    useFocusStore().setDurations(1, 1)
+    await wrapper.get('.timer-actions .app-button').trigger('click')
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    expect(start).toHaveBeenCalledTimes(2)
   })
 
   it('has no critical automated accessibility violations', async () => {

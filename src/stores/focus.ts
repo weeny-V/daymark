@@ -15,7 +15,11 @@ const defaultTimer = (): FocusTimerState => ({
   remainingSeconds: 25 * 60,
 })
 
-export const createEmptyFocusData = (): FocusData => ({ timer: defaultTimer(), sessions: [] })
+export const createEmptyFocusData = (): FocusData => ({
+  timer: defaultTimer(),
+  sessions: [],
+  soundEnabled: true,
+})
 
 const isIsoDate = (value: unknown): value is string =>
   typeof value === 'string' &&
@@ -59,7 +63,12 @@ const isTimer = (value: unknown): value is FocusTimerState => {
 export const isFocusData = (value: unknown): value is FocusData => {
   if (typeof value !== 'object' || value === null) return false
   const data = value as Record<string, unknown>
-  return isTimer(data.timer) && Array.isArray(data.sessions) && data.sessions.every(isSession)
+  return (
+    isTimer(data.timer) &&
+    Array.isArray(data.sessions) &&
+    data.sessions.every(isSession) &&
+    (data.soundEnabled === undefined || typeof data.soundEnabled === 'boolean')
+  )
 }
 
 export const useFocusStore = defineStore('focus', () => {
@@ -70,19 +79,25 @@ export const useFocusStore = defineStore('focus', () => {
   })
   const timer = ref<FocusTimerState>(defaultTimer())
   const sessions = ref<FocusSession[]>([])
+  const soundEnabled = ref(true)
   let initialized = false
 
   const durationSeconds = computed(
     () => (timer.value.mode === 'focus' ? timer.value.focusMinutes : timer.value.breakMinutes) * 60,
   )
 
-  const persistable = computed<FocusData>(() => ({ timer: timer.value, sessions: sessions.value }))
+  const persistable = computed<FocusData>(() => ({
+    timer: timer.value,
+    sessions: sessions.value,
+    soundEnabled: soundEnabled.value,
+  }))
 
   const initialize = () => {
     if (initialized) return
     const saved = storage.get()
     timer.value = saved.timer
     sessions.value = saved.sessions
+    soundEnabled.value = saved.soundEnabled ?? true
     watch(persistable, (value) => storage.set(value), { deep: true })
     initialized = true
     tick()
@@ -177,12 +192,14 @@ export const useFocusStore = defineStore('focus', () => {
   const replaceAll = (value: FocusData) => {
     timer.value = structuredClone(value.timer)
     sessions.value = structuredClone(value.sessions)
+    soundEnabled.value = value.soundEnabled ?? true
     tick()
   }
 
   return {
     timer,
     sessions,
+    soundEnabled,
     durationSeconds,
     initialize,
     setDurations,

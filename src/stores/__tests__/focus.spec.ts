@@ -87,4 +87,25 @@ describe('focus store', () => {
     expect(store.timer).toMatchObject({ status: 'idle', focusMinutes: 25, breakMinutes: 5 })
     expect(warning).toHaveBeenCalled()
   })
+
+  it('persists the sound preference while accepting older saved focus data', async () => {
+    localStorage.setItem(
+      'daymark.focus',
+      JSON.stringify({
+        timer: {
+          status: 'idle',
+          mode: 'focus',
+          focusMinutes: 25,
+          breakMinutes: 5,
+          remainingSeconds: 1500,
+        },
+        sessions: [],
+      }),
+    )
+    const store = createStore()
+    expect(store.soundEnabled).toBe(true)
+    store.soundEnabled = false
+    await nextTick()
+    expect(JSON.parse(localStorage.getItem('daymark.focus') ?? '{}').soundEnabled).toBe(false)
+  })
 })

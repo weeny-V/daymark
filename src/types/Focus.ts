@@ -24,4 +24,5 @@ export interface FocusTimerState {
 export interface FocusData {
   timer: FocusTimerState
   sessions: FocusSession[]
+  soundEnabled?: boolean
 }
