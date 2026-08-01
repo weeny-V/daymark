@@ -6,6 +6,7 @@ import { useForm } from '@/shared/hooks/useForm'
 import type { Task, TaskChanges } from '@/types/Task'
 import { storeToRefs } from 'pinia'
 import { useOrganizationStore } from '@/stores/organization'
+import AppTaskRecurrenceFields from '@/components/tasks/AppTaskRecurrenceFields.vue'
 
 const { projects, tags } = storeToRefs(useOrganizationStore())
 
@@ -33,6 +34,8 @@ const {
     dueTo: props.task.dueTo ?? '',
     projectId: props.task.projectId ?? '',
     tagIds: props.task.tagIds ?? [],
+    recurrenceType: props.task.recurrence?.type ?? '',
+    weekdays: props.task.recurrence?.type === 'weekdays' ? props.task.recurrence.weekdays : [],
   },
   validators: {
     title: (value) => {
@@ -41,6 +44,12 @@ const {
     dueTo: (value) => {
       if (value && (!dayjs(value).isValid() || dayjs(value).format('YYYY-MM-DD') !== value)) {
         return 'Enter a valid due date'
+      }
+    },
+    recurrenceType: (value, state) => {
+      if (value && !state.dueTo) return 'Choose a due date for a recurring task'
+      if (value === 'weekdays' && state.weekdays.length === 0) {
+        return 'Choose at least one weekday'
       }
     },
   },
@@ -52,6 +61,11 @@ const submit = handleSubmit((values) => {
     dueTo: values.dueTo || undefined,
     projectId: values.projectId || undefined,
     tagIds: values.tagIds,
+    recurrence: values.recurrenceType
+      ? values.recurrenceType === 'weekdays'
+        ? { type: 'weekdays', weekdays: values.weekdays }
+        : { type: values.recurrenceType as 'daily' | 'weekly' }
+      : undefined,
   })
 })
 </script>
@@ -85,6 +99,13 @@ const submit = handleSubmit((values) => {
       name="editDueTo"
       hint="Choose a date, or leave it empty for no due date."
       :error="errors.dueTo"
+      :disabled="disabled"
+    />
+
+    <AppTaskRecurrenceFields
+      v-model:type="form.recurrenceType"
+      v-model:weekdays="form.weekdays"
+      :error="errors.recurrenceType"
       :disabled="disabled"
     />
 

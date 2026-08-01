@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Subtask, Task, TaskChanges, TaskFilter, TaskPriority } from '@/types/Task.ts'
+import type { Subtask, Task, TaskChanges, TaskFilter, TaskPriority, TaskRecurrence } from '@/types/Task.ts'
 import { useLocalStorage } from '@/shared/hooks/useLocalStorage.ts'
 import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
@@ -9,6 +9,24 @@ import { compareDateStrings } from '@/shared/utils/date.ts'
 
 const TASKS_STORAGE_KEY = 'daymark.tasks'
 const taskPriorities: TaskPriority[] = ['low', 'medium', 'high']
+const isRecurrence = (value: unknown): value is TaskRecurrence => {
+  if (typeof value !== 'object' || value === null) return false
+  const recurrence = value as Record<string, unknown>
+  if (recurrence.type === 'daily' || recurrence.type === 'weekly') return true
+  return (
+    recurrence.type === 'weekdays' &&
+    Array.isArray(recurrence.weekdays) &&
+    recurrence.weekdays.length > 0 &&
+    recurrence.weekdays.every(
+      (day) => Number.isInteger(day) && Number(day) >= 0 && Number(day) <= 6,
+    ) &&
+    new Set(recurrence.weekdays).size === recurrence.weekdays.length
+  )
+}
+const copyRecurrence = (recurrence: TaskRecurrence): TaskRecurrence =>
+  recurrence.type === 'weekdays'
+    ? { type: 'weekdays', weekdays: [...recurrence.weekdays] }
+    : { type: recurrence.type }
 const isDateOnly = (value: unknown): value is string =>
   typeof value === 'string' &&
   /^\d{4}-\d{2}-\d{2}$/.test(value) &&
@@ -43,6 +61,8 @@ const isTask = (value: unknown): value is Task => {
     !Number.isNaN(Date.parse(task.createdAt)) &&
     (task.priority === undefined || taskPriorities.includes(task.priority as TaskPriority)) &&
     (task.dueTo === undefined || isDateOnly(task.dueTo)) &&
+    (task.recurrence === undefined || (isRecurrence(task.recurrence) && isDateOnly(task.dueTo))) &&
+    (task.generatedFromTaskId === undefined || typeof task.generatedFromTaskId === 'string') &&
     (task.projectId === undefined || typeof task.projectId === 'string') &&
     (task.tagIds === undefined ||
       (Array.isArray(task.tagIds) &&
@@ -106,9 +126,22 @@ export const useTasksStore = defineStore('tasks', () => {
     return organizationFilteredTasks.value
   })
 
-  const addTask = ({ title, dueTo }: { title: string; dueTo?: string }) => {
+  const addTask = ({
+    title,
+    dueTo,
+    recurrence,
+  }: {
+    title: string
+    dueTo?: string
+    recurrence?: TaskRecurrence
+  }) => {
     const normalizedTitle = title.trim()
-    if (!normalizedTitle || (dueTo && !isDateOnly(dueTo))) return false
+    if (
+      !normalizedTitle ||
+      (dueTo && !isDateOnly(dueTo)) ||
+      (recurrence && (!isRecurrence(recurrence) || !dueTo))
+    )
+      return false
 
     const settingsStore = useSettingsStore()
     const newTask: Task = {
@@ -118,6 +151,7 @@ export const useTasksStore = defineStore('tasks', () => {
       createdAt: new Date().toISOString(),
       priority: settingsStore.defaultTaskPriority,
       ...(dueTo ? { dueTo } : {}),
+      ...(recurrence ? { recurrence: copyRecurrence(recurrence) } : {}),
       order: Math.max(0, ...tasks.value.map((task) => task.order ?? 0)) + 1000,
       subtasks: [],
     }
@@ -132,6 +166,19 @@ export const useTasksStore = defineStore('tasks', () => {
     const normalizedTitle = changes.title?.trim()
     if (changes.title !== undefined && !normalizedTitle) return false
     if (changes.dueTo && !isDateOnly(changes.dueTo)) return false
+    if (
+      changes.recurrence &&
+      (!isRecurrence(changes.recurrence) || !(changes.dueTo ?? task.dueTo))
+    ) {
+      return false
+    }
+    if (
+      Object.hasOwn(changes, 'dueTo') &&
+      !changes.dueTo &&
+      (changes.recurrence ?? task.recurrence)
+    ) {
+      return false
+    }
 
     if (normalizedTitle !== undefined) task.title = normalizedTitle
 
@@ -144,6 +191,10 @@ export const useTasksStore = defineStore('tasks', () => {
       else delete task.projectId
     }
     if (changes.tagIds !== undefined) task.tagIds = [...new Set(changes.tagIds)]
+    if (Object.hasOwn(changes, 'recurrence')) {
+      if (changes.recurrence) task.recurrence = copyRecurrence(changes.recurrence)
+      else delete task.recurrence
+    }
 
     return true
   }
@@ -234,12 +285,42 @@ export const useTasksStore = defineStore('tasks', () => {
     })
   }
 
+  const nextDueDate = (dueTo: string, recurrence: TaskRecurrence) => {
+    const dueDate = dayjs(dueTo)
+    if (recurrence.type === 'daily') return dueDate.add(1, 'day').format('YYYY-MM-DD')
+    if (recurrence.type === 'weekly') return dueDate.add(1, 'week').format('YYYY-MM-DD')
+
+    for (let offset = 1; offset <= 7; offset += 1) {
+      const candidate = dueDate.add(offset, 'day')
+      if (recurrence.weekdays.includes(candidate.day())) return candidate.format('YYYY-MM-DD')
+    }
+    return dueTo
+  }
+
   const toggleTask = (id: string) => {
     const task = tasks.value.find((task) => task.id === id)
     if (!task || (!task.completed && task.subtasks?.some((subtask) => !subtask.completed))) {
       return false
     }
-    task.completed = !task.completed
+    const completing = !task.completed
+    task.completed = completing
+    if (
+      completing &&
+      task.recurrence &&
+      task.dueTo &&
+      !tasks.value.some((candidate) => candidate.generatedFromTaskId === task.id)
+    ) {
+      tasks.value.push({
+        ...task,
+        id: crypto.randomUUID(),
+        completed: false,
+        createdAt: new Date().toISOString(),
+        dueTo: nextDueDate(task.dueTo, task.recurrence),
+        generatedFromTaskId: task.id,
+        recurrence: copyRecurrence(task.recurrence),
+        ...(task.tagIds ? { tagIds: [...task.tagIds] } : {}),
+      })
+    }
     return true
   }
 

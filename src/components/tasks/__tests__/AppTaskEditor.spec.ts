@@ -33,6 +33,7 @@ describe('AppTaskEditor', () => {
           dueTo: '2026-08-12',
           projectId: undefined,
           tagIds: [],
+          recurrence: undefined,
         },
       ],
     ])
@@ -66,5 +67,33 @@ describe('AppTaskEditor', () => {
 
     expect(wrapper.emitted('cancel')).toEqual([[]])
     expect(wrapper.emitted('save')).toBeUndefined()
+  })
+
+  it('creates, edits, and removes a recurrence rule', async () => {
+    const wrapper = mountEditor()
+
+    await wrapper.get('select[name="recurrenceType"]').setValue('weekdays')
+    const weekdayInputs = wrapper.findAll('.recurrence-fields__weekdays input')
+    await weekdayInputs[0]!.setValue(true)
+    await weekdayInputs[2]!.setValue(true)
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+      recurrence: { type: 'weekdays', weekdays: [1, 3] },
+    })
+
+    await wrapper.get('select[name="recurrenceType"]').setValue('')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('save')?.[1]?.[0]).toMatchObject({ recurrence: undefined })
+  })
+
+  it('requires a due date and at least one day for recurrence', async () => {
+    const wrapper = mountEditor()
+    await wrapper.get('input[name="editDueTo"]').setValue('')
+    await wrapper.get('select[name="recurrenceType"]').setValue('weekdays')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('save')).toBeUndefined()
+    expect(wrapper.get('[role="alert"]').text()).toContain('Choose a due date')
   })
 })

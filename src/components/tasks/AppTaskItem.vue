@@ -58,6 +58,12 @@ const priorityLabels = {
   medium: 'Medium priority',
   high: 'High priority',
 } as const
+
+const recurrenceLabel = (task: Task) => {
+  if (task.recurrence?.type === 'daily') return 'Repeats daily'
+  if (task.recurrence?.type === 'weekly') return 'Repeats weekly'
+  if (task.recurrence?.type === 'weekdays') return 'Repeats on selected weekdays'
+}
 </script>
 
 <template>
@@ -96,6 +102,9 @@ const priorityLabels = {
           Due
           <time :datetime="task.dueTo">{{ formatDate(task.dueTo, dateFormat) }}</time>
         </span>
+        <span v-if="task.recurrence" class="task-item__recurrence">{{
+          recurrenceLabel(task)
+        }}</span>
         <span class="task-item__created">
           Created
           <time :datetime="task.createdAt">{{ formatDate(task.createdAt, dateFormat) }}</time>

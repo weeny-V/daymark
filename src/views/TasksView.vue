@@ -14,6 +14,8 @@ import AppTaskEditDialog from '@/components/tasks/AppTaskEditDialog.vue'
 import { computed, ref } from 'vue'
 import TaskOrganizationPanel from '@/components/tasks/TaskOrganizationPanel.vue'
 import { useOrganizationStore } from '@/stores/organization'
+import AppTaskRecurrenceFields from '@/components/tasks/AppTaskRecurrenceFields.vue'
+import type { TaskRecurrence } from '@/types/Task'
 
 const tasksStore = useTasksStore()
 const organizationStore = useOrganizationStore()
@@ -40,6 +42,8 @@ const {
   initialState: {
     title: '',
     dueTo: '',
+    recurrenceType: '',
+    weekdays: [] as number[],
   },
   validators: {
     title: (value) => {
@@ -50,11 +54,26 @@ const {
         return 'Due date must be today or later'
       }
     },
+    recurrenceType: (value, state) => {
+      if (value && !state.dueTo) return 'Choose a due date for a recurring task'
+      if (value === 'weekdays' && state.weekdays.length === 0) {
+        return 'Choose at least one weekday'
+      }
+    },
   },
 })
 
 const submitTask = handleSubmit((values) => {
-  addTask(values)
+  const recurrence = values.recurrenceType
+    ? values.recurrenceType === 'weekdays'
+      ? { type: 'weekdays' as const, weekdays: values.weekdays }
+      : { type: values.recurrenceType as 'daily' | 'weekly' }
+    : undefined
+  addTask({
+    title: values.title,
+    dueTo: values.dueTo || undefined,
+    recurrence: recurrence as TaskRecurrence,
+  })
   reset()
 })
 const openEditor = (taskId: string) => {
@@ -117,6 +136,12 @@ const filterSummary = computed(() => {
         name="dueTo"
         :error="errors.dueTo"
         hint="When should this task be completed?"
+      />
+
+      <AppTaskRecurrenceFields
+        v-model:type="form.recurrenceType"
+        v-model:weekdays="form.weekdays"
+        :error="errors.recurrenceType"
       />
 
       <AppButton type="submit">Add task</AppButton>
@@ -231,12 +256,11 @@ h1 {
 
 @media (min-width: 700px) {
   .task-form {
-    grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.65fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.65fr);
   }
 
   .task-form > :last-child {
-    width: auto;
-    margin-top: 1.725rem;
+    grid-column: 1 / -1;
   }
 }
 
