@@ -64,7 +64,10 @@ describe('TasksView', () => {
     await editForm.trigger('submit')
 
     expect(store.tasks[0]).toMatchObject({ title: 'Updated task', dueTo: '2026-08-12' })
-    expect(wrapper.find('dialog').exists()).toBe(false)
+    const taskDialog = wrapper.findAll('dialog').find((dialog) => dialog.text().includes('Edit task'))!
+    expect(taskDialog.classes()).toContain('app-dialog--closing')
+    await new Promise((resolve) => window.setTimeout(resolve, 240))
+    expect(taskDialog.attributes()).not.toHaveProperty('open')
   })
 
   it('manages organization, assigns it, and composes filters', async () => {
@@ -132,7 +135,9 @@ describe('TasksView', () => {
     await panel.get('#organization-edit-form').trigger('submit')
 
     expect(organization.projects[0]?.name).toBe('Client work')
-    expect(panel.find('dialog').exists()).toBe(false)
+    expect(panel.get('dialog').classes()).toContain('app-dialog--closing')
+    await new Promise((resolve) => window.setTimeout(resolve, 240))
+    expect(panel.get('dialog').attributes()).not.toHaveProperty('open')
   })
 
   it('has no critical automated accessibility violations', async () => {

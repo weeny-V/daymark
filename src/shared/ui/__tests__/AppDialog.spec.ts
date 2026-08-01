@@ -38,6 +38,19 @@ describe('AppDialog', () => {
     expect(wrapper.emitted('dismiss')).toEqual([['button']])
   })
 
+  it('keeps the dialog visible while its closing animation runs', async () => {
+    const wrapper = mount(AppDialog, {
+      props: { open: true, title: 'Edit due date' },
+    })
+
+    await wrapper.setProps({ open: false })
+
+    expect(wrapper.get('dialog').attributes()).toHaveProperty('open')
+    expect(wrapper.get('dialog').classes()).toContain('app-dialog--closing')
+    await new Promise((resolve) => window.setTimeout(resolve, 240))
+    expect(wrapper.get('dialog').attributes()).not.toHaveProperty('open')
+  })
+
   it('requests closing when Escape is pressed', async () => {
     const wrapper = mount(AppDialog, {
       props: { open: true, title: 'Edit due date' },

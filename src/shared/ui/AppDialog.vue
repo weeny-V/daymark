@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, useId, useTemplateRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -21,6 +21,8 @@ const emit = defineEmits<{
 }>()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
+const closing = ref(false)
+let closeTimer: number | undefined
 const generatedId = useId()
 const titleId = `dialog-${generatedId}-title`
 const descriptionId = computed(() =>
@@ -32,16 +34,27 @@ const syncOpenState = () => {
   if (!element) return
 
   if (open.value && !element.open) {
+    window.clearTimeout(closeTimer)
+    closing.value = false
     if (typeof element.showModal === 'function') {
       element.showModal()
     } else {
       element.setAttribute('open', '')
     }
-  } else if (!open.value && element.open) {
-    if (typeof element.close === 'function') {
-      element.close()
+  } else if (open.value && closing.value) {
+    window.clearTimeout(closeTimer)
+    closing.value = false
+  } else if (!open.value && element.open && !closing.value) {
+    const closeElement = () => {
+      closing.value = false
+      if (typeof element.close === 'function') element.close()
+      else element.removeAttribute('open')
+    }
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      closeElement()
     } else {
-      element.removeAttribute('open')
+      closing.value = true
+      closeTimer = window.setTimeout(closeElement, 220)
     }
   }
 }
@@ -64,12 +77,14 @@ const handleNativeClose = () => {
 
 watch(open, syncOpenState, { flush: 'post' })
 onMounted(syncOpenState)
+onBeforeUnmount(() => window.clearTimeout(closeTimer))
 </script>
 
 <template>
   <dialog
     ref="dialog"
     class="app-dialog"
+    :class="{ 'app-dialog--closing': closing }"
     :aria-labelledby="titleId"
     :aria-describedby="descriptionId"
     @cancel="handleCancel"
@@ -124,6 +139,7 @@ onMounted(syncOpenState)
 .app-dialog::backdrop {
   background: rgb(15 17 24 / 58%);
   backdrop-filter: blur(2px);
+  animation: app-dialog-backdrop-in 200ms ease-out both;
 }
 
 .app-dialog__surface {
@@ -133,6 +149,38 @@ onMounted(syncOpenState)
   border-radius: var(--radius-md);
   box-shadow: 0 24px 64px rgb(15 17 24 / 28%);
   overflow: auto;
+  animation: app-dialog-surface-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: 50% 45%;
+}
+
+.app-dialog--closing::backdrop {
+  animation: app-dialog-backdrop-out 200ms ease-in both;
+}
+
+.app-dialog--closing .app-dialog__surface {
+  animation: app-dialog-surface-out 200ms ease-in both;
+}
+
+@keyframes app-dialog-backdrop-in {
+  from { opacity: 0; }
+}
+
+@keyframes app-dialog-backdrop-out {
+  to { opacity: 0; }
+}
+
+@keyframes app-dialog-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.97);
+  }
+}
+
+@keyframes app-dialog-surface-out {
+  to {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
 }
 
 .app-dialog__header {
@@ -230,6 +278,13 @@ onMounted(syncOpenState)
 @media (prefers-reduced-motion: reduce) {
   .app-dialog::backdrop {
     backdrop-filter: none;
+  }
+
+  .app-dialog__surface,
+  .app-dialog--closing .app-dialog__surface,
+  .app-dialog::backdrop,
+  .app-dialog--closing::backdrop {
+    animation: none;
   }
 }
 </style>

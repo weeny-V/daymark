@@ -127,7 +127,6 @@ const remove = (kind: 'project' | 'tag', id: string) => {
   </section>
 
   <AppDialog
-    v-if="editDialogOpen"
     v-model:open="editDialogOpen"
     :title="`Edit ${editing?.kind ?? 'item'}`"
     description="Update the name, then save your changes."

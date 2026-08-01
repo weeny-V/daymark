@@ -155,7 +155,9 @@ describe('AppTaskItem', () => {
     await wrapper.get('#subtask-edit-form').trigger('submit')
 
     expect(store.tasks[0]?.subtasks?.[0]?.title).toBe('Draft agenda')
-    expect(wrapper.find('dialog').exists()).toBe(false)
+    expect(wrapper.get('dialog').classes()).toContain('app-dialog--closing')
+    await new Promise((resolve) => window.setTimeout(resolve, 240))
+    expect(wrapper.get('dialog').attributes()).not.toHaveProperty('open')
   })
 
   it('shows and applies an exact drag insertion position', async () => {

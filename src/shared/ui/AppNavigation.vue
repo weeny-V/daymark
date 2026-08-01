@@ -48,11 +48,15 @@ const closeMore = () => {
       </li>
       <li><button ref="moreButton" class="nav-link nav-link--button" :class="{ 'nav-link--active': moreIsActive }" type="button" aria-haspopup="dialog" :aria-expanded="moreOpen" aria-controls="mobile-more-sheet" @click="openMore"><AppNavigationIcon icon="more" /><span>More</span></button></li>
     </ul>
-    <button v-if="moreOpen" class="more-backdrop" type="button" aria-label="Close more navigation" @click="closeMore" />
-    <section v-if="moreOpen" id="mobile-more-sheet" ref="moreSheet" class="more-sheet" role="dialog" aria-modal="true" aria-labelledby="more-sheet-title" @keydown.esc="closeMore">
-      <header><div><p>Navigation</p><h2 id="more-sheet-title">More</h2></div><button type="button" aria-label="Close more navigation" @click="closeMore">×</button></header>
-      <ul><li v-for="destination in moreDestinations" :key="destination.to"><RouterLink class="more-link" :to="destination.to" @click="closeMore"><AppNavigationIcon :icon="destination.icon" /><span>{{ destination.label }}</span><span aria-hidden="true">›</span></RouterLink></li></ul>
-    </section>
+    <Transition name="more-backdrop">
+      <button v-if="moreOpen" class="more-backdrop" type="button" aria-label="Close more navigation" @click="closeMore" />
+    </Transition>
+    <Transition name="more-sheet">
+      <section v-if="moreOpen" id="mobile-more-sheet" ref="moreSheet" class="more-sheet" role="dialog" aria-modal="true" aria-labelledby="more-sheet-title" @keydown.esc="closeMore">
+        <header><div><p>Navigation</p><h2 id="more-sheet-title">More</h2></div><button type="button" aria-label="Close more navigation" @click="closeMore">×</button></header>
+        <ul><li v-for="destination in moreDestinations" :key="destination.to"><RouterLink class="more-link" :to="destination.to" @click="closeMore"><AppNavigationIcon :icon="destination.icon" /><span>{{ destination.label }}</span><span aria-hidden="true">›</span></RouterLink></li></ul>
+      </section>
+    </Transition>
   </nav>
 </template>
 
@@ -167,6 +171,16 @@ const closeMore = () => {
     backdrop-filter: blur(2px);
   }
 
+  .more-backdrop-enter-active,
+  .more-backdrop-leave-active {
+    transition: opacity 220ms ease;
+  }
+
+  .more-backdrop-enter-from,
+  .more-backdrop-leave-to {
+    opacity: 0;
+  }
+
   .more-sheet {
     position: fixed;
     z-index: 41;
@@ -179,6 +193,19 @@ const closeMore = () => {
     background: var(--color-surface);
     border-radius: var(--radius-md) var(--radius-md) 0 0;
     box-shadow: 0 -16px 40px rgb(17 19 26 / 18%);
+  }
+
+  .more-sheet-enter-active,
+  .more-sheet-leave-active {
+    transition:
+      opacity 240ms ease,
+      transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .more-sheet-enter-from,
+  .more-sheet-leave-to {
+    opacity: 0;
+    transform: translateY(100%);
   }
 
   .more-sheet header {
@@ -247,6 +274,15 @@ const closeMore = () => {
     color: var(--color-primary);
     background: var(--color-primary-soft);
     border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .more-backdrop-enter-active,
+    .more-backdrop-leave-active,
+    .more-sheet-enter-active,
+    .more-sheet-leave-active {
+      transition: none;
+    }
   }
 }
 </style>

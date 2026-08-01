@@ -396,7 +396,6 @@ onBeforeUnmount(() => {
         <p v-else class="subtasks__empty">No subtasks yet.</p>
 
         <AppDialog
-          v-if="editDialogOpen"
           v-model:open="editDialogOpen"
           title="Edit subtask"
           description="Update the subtask title, then save your changes."
