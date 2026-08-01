@@ -5,6 +5,14 @@ export type TaskRecurrence =
   | { type: 'weekly' }
   | { type: 'weekdays'; weekdays: number[] }
 
+export type Subtask = {
+  id: string
+  title: string
+  completed: boolean
+  createdAt: string
+  order: number
+}
+
 export type Task = {
   title: string
   completed: boolean
@@ -16,6 +24,8 @@ export type Task = {
   tagIds?: string[]
   recurrence?: TaskRecurrence
   generatedFromTaskId?: string
+  order?: number
+  subtasks?: Subtask[]
 }
 
 export type TaskChanges = {

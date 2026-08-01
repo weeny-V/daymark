@@ -238,13 +238,16 @@ const scheduleLabel = (habit: Habit) =>
           </template>
         </AppField>
 
-        <fieldset>
+        <fieldset class="schedule-options">
           <legend>Schedule</legend>
-          <label><input v-model="form.scheduleType" type="radio" value="daily" /> Every day</label>
-          <label
-            ><input v-model="form.scheduleType" type="radio" value="weekdays" /> Selected
-            weekdays</label
-          >
+          <label class="schedule-option">
+            <input v-model="form.scheduleType" type="radio" value="daily" />
+            <span><strong>Every day</strong><small>Keep this habit in your daily routine.</small></span>
+          </label>
+          <label class="schedule-option">
+            <input v-model="form.scheduleType" type="radio" value="weekdays" />
+            <span><strong>Selected weekdays</strong><small>Choose the days that fit your routine.</small></span>
+          </label>
         </fieldset>
 
         <fieldset
@@ -499,6 +502,18 @@ h3 {
   align-items: center;
   min-height: 2.75rem;
 }
+.habit-form .schedule-options { display: grid; grid-template-columns: 1fr 1fr; }
+.schedule-option { position: relative; gap: var(--space-3) !important; min-height: 5rem !important; padding: var(--space-3) var(--space-4); background: var(--color-surface-soft); border: 1px solid var(--color-control-border); border-radius: var(--radius-sm); cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease; }
+.schedule-option:hover { border-color: var(--color-control-hover); }
+.schedule-option:has(input:checked) { background: var(--color-primary-soft); border-color: var(--color-primary); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 25%, transparent); }
+.schedule-option input { display: grid; flex: 0 0 auto; width: 1.25rem; height: 1.25rem; margin: 0; appearance: none; background: var(--color-surface); border: 2px solid var(--color-control-border); border-radius: 50%; cursor: pointer; place-content: center; }
+.schedule-option input::before { width: .625rem; height: .625rem; background: var(--color-primary); border-radius: 50%; content: ''; transform: scale(0); transition: transform 120ms ease; }
+.schedule-option input:checked { border-color: var(--color-primary); }
+.schedule-option input:checked::before { transform: scale(1); }
+.schedule-option input:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-focus) 35%, transparent); outline-offset: 3px; }
+.schedule-option span, .schedule-option strong, .schedule-option small { display: block; }
+.schedule-option strong { color: var(--color-text); font-size: .875rem; line-height: 1.4; }
+.schedule-option small { margin-top: var(--space-1); color: var(--color-text-muted); font-size: .75rem; line-height: 1.45; }
 .weekday-picker {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -561,6 +576,7 @@ h3 {
   }
 }
 @media (max-width: 420px) {
+  .habit-form .schedule-options { grid-template-columns: 1fr; }
   .weekday-picker {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -569,6 +585,7 @@ h3 {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .schedule-option, .schedule-option input::before { transition: none; }
   * {
     scroll-behavior: auto;
   }

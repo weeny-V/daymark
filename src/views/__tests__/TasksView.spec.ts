@@ -113,6 +113,22 @@ describe('TasksView', () => {
     expect(wrapper.text()).toContain('Active tasks, project Work, tag Focus')
   })
 
+  it('opens a dialog before renaming organization metadata', async () => {
+    const wrapper = mountTasksView()
+    const organization = useOrganizationStore()
+    organization.replaceAll({ version: 1, projects: [{ id: 'project-1', name: 'Work' }], tags: [] })
+    await wrapper.vm.$nextTick()
+
+    const panel = wrapper.getComponent({ name: 'TaskOrganizationPanel' })
+    expect(panel.find('#organization-edit-name').exists()).toBe(false)
+    await panel.get('li button').trigger('click')
+    await panel.get('#organization-edit-name').setValue('Client work')
+    await panel.get('#organization-edit-form').trigger('submit')
+
+    expect(organization.projects[0]?.name).toBe('Client work')
+    expect(panel.find('dialog').exists()).toBe(false)
+  })
+
   it('has no critical automated accessibility violations', async () => {
     const wrapper = mountTasksView()
     document.body.append(wrapper.element)

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Task, TaskChanges, TaskFilter, TaskPriority, TaskRecurrence } from '@/types/Task.ts'
+import type { Subtask, Task, TaskChanges, TaskFilter, TaskPriority, TaskRecurrence } from '@/types/Task.ts'
 import { useLocalStorage } from '@/shared/hooks/useLocalStorage.ts'
 import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
@@ -33,6 +33,21 @@ const isDateOnly = (value: unknown): value is string =>
   dayjs(value).isValid() &&
   dayjs(value).format('YYYY-MM-DD') === value
 
+const isSubtask = (value: unknown): value is Subtask => {
+  if (typeof value !== 'object' || value === null) return false
+  const subtask = value as Record<string, unknown>
+  return (
+    typeof subtask.id === 'string' &&
+    typeof subtask.title === 'string' &&
+    !!subtask.title.trim() &&
+    typeof subtask.completed === 'boolean' &&
+    typeof subtask.createdAt === 'string' &&
+    !Number.isNaN(Date.parse(subtask.createdAt)) &&
+    typeof subtask.order === 'number' &&
+    Number.isFinite(subtask.order)
+  )
+}
+
 const isTask = (value: unknown): value is Task => {
   if (typeof value !== 'object' || value === null) return false
 
@@ -52,7 +67,12 @@ const isTask = (value: unknown): value is Task => {
     (task.tagIds === undefined ||
       (Array.isArray(task.tagIds) &&
         task.tagIds.every((id) => typeof id === 'string') &&
-        new Set(task.tagIds).size === task.tagIds.length))
+        new Set(task.tagIds).size === task.tagIds.length)) &&
+    (task.order === undefined || (typeof task.order === 'number' && Number.isFinite(task.order))) &&
+    (task.subtasks === undefined ||
+      (Array.isArray(task.subtasks) &&
+        task.subtasks.every(isSubtask) &&
+        new Set(task.subtasks.map((subtask) => subtask.id)).size === task.subtasks.length))
   )
 }
 
@@ -68,11 +88,18 @@ export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref<Task[]>([])
   const selectedFilter = ref<TaskFilter>('all')
   let initialized = false
+  const normalizeTasks = (value: Task[]) =>
+    value.map((task, index) => ({
+      ...structuredClone(task),
+      order: task.order ?? (index + 1) * 1000,
+      subtasks: [...(task.subtasks ?? [])].sort((a, b) => a.order - b.order),
+    }))
 
   const initialize = () => {
     if (initialized) return
 
-    tasks.value = storage.get()
+    tasks.value = normalizeTasks(storage.get())
+    storage.set(tasks.value)
     watch(tasks, (value) => storage.set(value), { deep: true })
     initialized = true
   }
@@ -86,7 +113,7 @@ export const useTasksStore = defineStore('tasks', () => {
     if (settings.selectedTagId !== 'all') {
       result = result.filter((task) => task.tagIds?.includes(settings.selectedTagId))
     }
-    return result
+    return [...result].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   })
 
   const filteredTasks = computed(() => {
@@ -125,6 +152,8 @@ export const useTasksStore = defineStore('tasks', () => {
       priority: settingsStore.defaultTaskPriority,
       ...(dueTo ? { dueTo } : {}),
       ...(recurrence ? { recurrence: copyRecurrence(recurrence) } : {}),
+      order: Math.max(0, ...tasks.value.map((task) => task.order ?? 0)) + 1000,
+      subtasks: [],
     }
     tasks.value.push(newTask)
     return true
@@ -174,8 +203,74 @@ export const useTasksStore = defineStore('tasks', () => {
     tasks.value = tasks.value.filter((task) => task.id !== id)
   }
 
+  const moveByOrder = <T extends { id: string; order: number }>(
+    items: T[],
+    id: string,
+    direction: 'up' | 'down',
+  ) => {
+    const ordered = [...items].sort((a, b) => a.order - b.order)
+    const index = ordered.findIndex((item) => item.id === id)
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (index < 0 || targetIndex < 0 || targetIndex >= ordered.length) return false
+    const current = ordered[index]!
+    const target = ordered[targetIndex]!
+    ;[current.order, target.order] = [target.order, current.order]
+    return true
+  }
+
+  const moveTask = (id: string, direction: 'up' | 'down', scopeIds?: string[]) => {
+    const scope = scopeIds ? tasks.value.filter((task) => scopeIds.includes(task.id)) : tasks.value
+    return moveByOrder(scope as (Task & { order: number })[], id, direction)
+  }
+
+  const addSubtask = (taskId: string, title: string) => {
+    const task = tasks.value.find((item) => item.id === taskId)
+    const normalized = title.trim()
+    if (!task || !normalized) return false
+    const subtasks = (task.subtasks ??= [])
+    subtasks.push({
+      id: crypto.randomUUID(),
+      title: normalized,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      order: Math.max(0, ...subtasks.map((subtask) => subtask.order)) + 1000,
+    })
+    return true
+  }
+
+  const updateSubtask = (taskId: string, subtaskId: string, title: string) => {
+    const subtask = tasks.value
+      .find((task) => task.id === taskId)
+      ?.subtasks?.find((item) => item.id === subtaskId)
+    const normalized = title.trim()
+    if (!subtask || !normalized) return false
+    subtask.title = normalized
+    return true
+  }
+
+  const toggleSubtask = (taskId: string, subtaskId: string) => {
+    const subtask = tasks.value
+      .find((task) => task.id === taskId)
+      ?.subtasks?.find((item) => item.id === subtaskId)
+    if (!subtask) return false
+    subtask.completed = !subtask.completed
+    return true
+  }
+
+  const deleteSubtask = (taskId: string, subtaskId: string) => {
+    const task = tasks.value.find((item) => item.id === taskId)
+    if (!task?.subtasks?.some((subtask) => subtask.id === subtaskId)) return false
+    task.subtasks = task.subtasks.filter((subtask) => subtask.id !== subtaskId)
+    return true
+  }
+
+  const moveSubtask = (taskId: string, subtaskId: string, direction: 'up' | 'down') => {
+    const subtasks = tasks.value.find((task) => task.id === taskId)?.subtasks
+    return subtasks ? moveByOrder(subtasks, subtaskId, direction) : false
+  }
+
   const replaceAll = (value: Task[]) => {
-    tasks.value = structuredClone(value)
+    tasks.value = normalizeTasks(value)
   }
 
   const clearProject = (id: string) => {
@@ -204,8 +299,9 @@ export const useTasksStore = defineStore('tasks', () => {
 
   const toggleTask = (id: string) => {
     const task = tasks.value.find((task) => task.id === id)
-    if (!task) return
-
+    if (!task || (!task.completed && task.subtasks?.some((subtask) => !subtask.completed))) {
+      return false
+    }
     const completing = !task.completed
     task.completed = completing
     if (
@@ -225,6 +321,7 @@ export const useTasksStore = defineStore('tasks', () => {
         ...(task.tagIds ? { tagIds: [...task.tagIds] } : {}),
       })
     }
+    return true
   }
 
   const count = computed(() => ({
@@ -247,16 +344,22 @@ export const useTasksStore = defineStore('tasks', () => {
 
   return {
     addTask,
+    addSubtask,
     count,
     clearProject,
     clearTag,
     deleteTask,
+    deleteSubtask,
     filteredTasks,
     initialize,
     replaceAll,
+    moveTask,
+    moveSubtask,
     tasks,
     toggleTask,
+    toggleSubtask,
     updateTask,
+    updateSubtask,
     selectedFilter,
     upcoming,
   }

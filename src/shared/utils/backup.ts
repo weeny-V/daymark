@@ -5,13 +5,15 @@ import type { Note } from '@/types/Note'
 import type { Settings } from '@/types/Settings'
 import type { Task } from '@/types/Task'
 import type { TaskOrganization } from '@/types/Organization'
+import type { FocusData } from '@/types/Focus'
 import { isHabitList, useHabitsStore } from '@/stores/habits'
 import { isNoteList, useNotesStore } from '@/stores/notes'
 import { isSettings, useSettingsStore } from '@/stores/settings'
 import { isTaskList, useTasksStore } from '@/stores/tasks'
 import { EMPTY_ORGANIZATION, isTaskOrganization, useOrganizationStore } from '@/stores/organization'
+import { createEmptyFocusData, isFocusData, useFocusStore } from '@/stores/focus'
 
-export const BACKUP_VERSION = 2
+export const BACKUP_VERSION = 3
 
 export interface DaymarkBackup {
   version: typeof BACKUP_VERSION
@@ -22,6 +24,7 @@ export interface DaymarkBackup {
     notes: Note[]
     habits: Habit[]
     organization: TaskOrganization
+    focus: FocusData
   }
 }
 
@@ -31,6 +34,7 @@ export interface BackupSummary {
   habits: number
   projects: number
   tags: number
+  focusSessions: number
 }
 
 const isExactObject = (value: unknown, keys: string[]): value is Record<string, unknown> =>
@@ -51,7 +55,7 @@ export const parseBackup = (source: string): DaymarkBackup => {
   if (!isExactObject(value, ['version', 'exportedAt', 'data'])) {
     throw new Error('This backup is incomplete or contains unsupported fields.')
   }
-  if (value.version !== 1 && value.version !== BACKUP_VERSION) {
+  if (value.version !== 1 && value.version !== 2 && value.version !== BACKUP_VERSION) {
     throw new Error(`Backup version ${String(value.version)} is not supported.`)
   }
   if (
@@ -64,7 +68,9 @@ export const parseBackup = (source: string): DaymarkBackup => {
   const dataKeys =
     value.version === 1
       ? ['tasks', 'settings', 'notes', 'habits']
-      : ['tasks', 'settings', 'notes', 'habits', 'organization']
+      : value.version === 2
+        ? ['tasks', 'settings', 'notes', 'habits', 'organization']
+        : ['tasks', 'settings', 'notes', 'habits', 'organization', 'focus']
   if (!isExactObject(value.data, dataKeys)) {
     throw new Error('The backup does not include every supported Daymark data type.')
   }
@@ -74,6 +80,12 @@ export const parseBackup = (source: string): DaymarkBackup => {
   if (!isHabitList(value.data.habits)) throw new Error('The backup contains invalid habits.')
   if (value.version === 2 && !isTaskOrganization(value.data.organization)) {
     throw new Error('The backup contains invalid projects or tags.')
+  }
+  if (value.version === 3 && !isTaskOrganization(value.data.organization)) {
+    throw new Error('The backup contains invalid projects or tags.')
+  }
+  if (value.version === 3 && !isFocusData(value.data.focus)) {
+    throw new Error('The backup contains invalid focus data.')
   }
 
   return {
@@ -85,9 +97,13 @@ export const parseBackup = (source: string): DaymarkBackup => {
       notes: structuredClone(value.data.notes),
       habits: structuredClone(value.data.habits),
       organization:
-        value.version === 2
+        value.version >= 2
           ? structuredClone(value.data.organization as TaskOrganization)
           : structuredClone(EMPTY_ORGANIZATION),
+      focus:
+        value.version === 3
+          ? structuredClone(value.data.focus as FocusData)
+          : createEmptyFocusData(),
     },
   }
 }
@@ -104,6 +120,11 @@ export const createBackup = (
     notes: structuredClone(toRaw(useNotesStore(pinia).notes)),
     habits: structuredClone(toRaw(useHabitsStore(pinia).habits)),
     organization: structuredClone(toRaw(useOrganizationStore(pinia).organization)),
+    focus: structuredClone({
+      timer: toRaw(useFocusStore(pinia).timer),
+      sessions: toRaw(useFocusStore(pinia).sessions),
+      soundEnabled: useFocusStore(pinia).soundEnabled,
+    }),
   },
 })
 
@@ -113,6 +134,7 @@ export const summarizeBackup = (backup: DaymarkBackup): BackupSummary => ({
   habits: backup.data.habits.length,
   projects: backup.data.organization.projects.length,
   tags: backup.data.organization.tags.length,
+  focusSessions: backup.data.focus.sessions.length,
 })
 
 export const restoreBackup = (pinia: Pinia, backup: DaymarkBackup) => {
@@ -121,4 +143,5 @@ export const restoreBackup = (pinia: Pinia, backup: DaymarkBackup) => {
   useNotesStore(pinia).replaceAll(backup.data.notes)
   useHabitsStore(pinia).replaceAll(backup.data.habits)
   useOrganizationStore(pinia).replaceAll(backup.data.organization)
+  useFocusStore(pinia).replaceAll(backup.data.focus)
 }

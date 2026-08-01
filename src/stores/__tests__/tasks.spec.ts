@@ -14,6 +14,7 @@ const savedTask: Task = {
   completed: false,
   createdAt: '2026-07-29T08:00:00.000Z',
 }
+const normalizedSavedTask = { ...savedTask, order: 1000, subtasks: [] }
 
 const createStore = () => {
   setActivePinia(createPinia())
@@ -79,7 +80,7 @@ describe('task store', () => {
     expect(
       store.updateTask(savedTask.id, { title: 'Should not be saved', dueTo: '2026-02-31' }),
     ).toBe(false)
-    expect(store.tasks[0]).toEqual(savedTask)
+    expect(store.tasks[0]).toEqual(normalizedSavedTask)
   })
 
   it('groups active scheduled tasks around the current local day in due-date order', () => {
@@ -112,7 +113,7 @@ describe('task store', () => {
 
     store.addTask({ title: 'Plan the next release' })
 
-    expect(store.tasks[0]).toEqual(savedTask)
+    expect(store.tasks[0]).toEqual(normalizedSavedTask)
     expect(store.tasks[1]?.priority).toBe('high')
   })
 
@@ -259,6 +260,55 @@ describe('task store', () => {
     expect(store.count).toEqual({ all: 1, active: 1, completed: 0 })
   })
 
+  it('adds, edits, completes, orders, and deletes one-level subtasks', () => {
+    const store = createStore()
+    store.replaceAll([savedTask])
+
+    expect(store.addSubtask(savedTask.id, 'First step')).toBe(true)
+    expect(store.addSubtask(savedTask.id, 'Second step')).toBe(true)
+    const [first, second] = store.tasks[0]!.subtasks!
+
+    expect(store.updateSubtask(savedTask.id, first!.id, 'Updated first step')).toBe(true)
+    expect(store.moveSubtask(savedTask.id, second!.id, 'up')).toBe(true)
+    expect(
+      [...store.tasks[0]!.subtasks!].sort((a, b) => a.order - b.order).map((item) => item.id),
+    ).toEqual([second!.id, first!.id])
+    expect(store.toggleSubtask(savedTask.id, first!.id)).toBe(true)
+    expect(store.deleteSubtask(savedTask.id, second!.id)).toBe(true)
+    expect(store.tasks[0]!.subtasks).toMatchObject([
+      { title: 'Updated first step', completed: true },
+    ])
+  })
+
+  it('blocks parent completion until all subtasks are complete', () => {
+    const store = createStore()
+    store.replaceAll([savedTask])
+    store.addSubtask(savedTask.id, 'Required step')
+    const subtask = store.tasks[0]!.subtasks![0]!
+
+    expect(store.toggleTask(savedTask.id)).toBe(false)
+    expect(store.tasks[0]?.completed).toBe(false)
+    store.toggleSubtask(savedTask.id, subtask.id)
+    expect(store.tasks[0]?.completed).toBe(false)
+    expect(store.toggleTask(savedTask.id)).toBe(true)
+    expect(store.tasks[0]?.completed).toBe(true)
+  })
+
+  it('persists explicit task order and migrates existing task data', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([savedTask, { ...savedTask, id: 'second' }]))
+    const store = createStore()
+    store.initialize()
+
+    expect(store.tasks.map((task) => task.order)).toEqual([1000, 2000])
+    expect(store.tasks.every((task) => Array.isArray(task.subtasks))).toBe(true)
+    expect(store.moveTask('second', 'up')).toBe(true)
+    await nextTick()
+
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY)!) as Task[]
+    expect(persisted.find((task) => task.id === 'second')?.order).toBe(1000)
+    expect(store.filteredTasks.map((task) => task.id)).toEqual(['second', savedTask.id])
+  })
+
   it('loads saved tasks and persists later changes', async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([savedTask]))
     const store = createStore()
@@ -267,9 +317,9 @@ describe('task store', () => {
     store.toggleTask(savedTask.id)
     await nextTick()
 
-    expect(store.tasks).toEqual([{ ...savedTask, completed: true }])
+    expect(store.tasks).toEqual([{ ...normalizedSavedTask, completed: true }])
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')).toEqual([
-      { ...savedTask, completed: true },
+      { ...normalizedSavedTask, completed: true },
     ])
   })
 
@@ -294,6 +344,6 @@ describe('task store', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([]))
     store.initialize()
 
-    expect(store.tasks).toEqual([savedTask])
+    expect(store.tasks).toEqual([normalizedSavedTask])
   })
 })
