@@ -42,6 +42,15 @@ const router = createRouter({
       },
     },
     {
+      path: '/focus',
+      name: 'focus',
+      component: () => import('../views/FocusView.vue'),
+      meta: {
+        title: 'Focus',
+        navigationLabel: 'Focus',
+      },
+    },
+    {
       path: '/notes',
       name: 'notes',
       component: () => import('../views/NotesView.vue'),

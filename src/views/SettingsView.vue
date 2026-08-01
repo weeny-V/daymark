@@ -173,8 +173,8 @@ const confirmRestore = () => {
         <div>
           <h2 id="data-title">Data backup</h2>
           <p>
-            Download tasks, settings, notes, and habits as JSON, or restore a Daymark backup.
-            Restoring replaces all current data after you review a summary.
+            Download tasks, settings, notes, habits, and focus history as JSON, or restore a Daymark
+            backup. Restoring replaces all current data after you review a summary.
           </p>
         </div>
         <div class="data-actions">
@@ -213,6 +213,10 @@ const confirmRestore = () => {
         <div>
           <dt>Habits</dt>
           <dd>{{ pendingSummary.habits }}</dd>
+        </div>
+        <div>
+          <dt>Focus sessions</dt>
+          <dd>{{ pendingSummary.focusSessions }}</dd>
         </div>
         <div>
           <dt>Projects</dt>
